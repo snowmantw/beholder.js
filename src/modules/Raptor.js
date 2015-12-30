@@ -12,38 +12,45 @@ export default class Raptor {
     this._closed = false;
   }
 
-  setup({ path: { phase: phasePath,
-                  raptor: raptorPath,
-                  test: testFilePath }}) {
+  invoke({ path: { phase: phasePath,
+                  raptor: raptorPath}}, testFilePath) {
+
+    this._channelCloseDeferred = new Defer();
     let runTest = child_process.spawn(
-        raptorPath, ['test', testFilePath],
-        {'env': {'RUNNING_PHASE': phasePath}}
+      raptorPath,
+      ['test', phasePath, testFilePath],
+      { detached: true }
     );
-    runTest.stdout.on('data', (data) => csp.putAsync(
-      this._channel, {'topic': 'log', 'payload':  data}));
-    runTest.stderr.on('data', (data) => csp.putAsync(
-      this._channel, {'topic': 'error', 'payload': data}));
-    return this;
+    runTest.unref();
+    runTest.stdout.on('data', (data) => {
+console.log('stdout: ' + data);
+      csp.putAsync(this._channel, {'topic': 'log', 'payload':  data});
+    });
+    runTest.stderr.on('data', (data) => {
+console.log('stderr: ' + data);
+      csp.putAsync(this._channel, {'topic': 'error', 'payload': data})
+    });
+    runTest.on('close', (status) => {
+console.log('child process exited with code ' + status);
+      csp.putAsync(this._channel, {'topic': 'status', 'payload': status});
+    });
+    
+    return this._channelCloseDeferred.promise;
   }
 
   /**
-   * The stage 'run' completes only when one of subscribers calls 'close' to
+   * The next stage 'invoke' completes only when one of subscribers calls 'close' to
    * finish the channel.
    */
   subscribe(...subs) {
-    this._channelCloseDeferred = new Defer();
     let publication = csp.operations.pub(this._channel, (e) => e.topic);
-    // Kick-off the test.
-    // Subscriber should call the close method to close the channel.
-    runTest.on('close', (status) => {
-      csp.putAsync(this._channel, {'topic': 'status', 'payload': status});
-    });
+
     // To give all subscribers a publication, so that they can do the subscription.
     // And give them the handler to close the channel.
     subs.forEach((sub) => {
       sub(publication, this.close.bind(this));
     });
-    return this._channelCloseDeferred.promise;
+    return this;
   }
 
   /**

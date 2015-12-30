@@ -16,26 +16,27 @@ export default class Configure {
 	}
 
   setup() {
-    this.validate(...this.getopts());
+    return this.build(...this.getopts());
   }
 
   /**
    * Will throw error when carrying invalid options.
    */
-  validate(argv, options) {
+  build(argv, options) {
     let testFilePaths = argv;
     this.validateTestFiles(testFilePaths);
-
     let configs = this.fromOptions(options);
+    configs.tests = testFilePaths;
     this.validateRaptor(configs);
     this.validatePhase(configs);
+    return configs;
   }
 
   getopts() {
     let parsedOptions = this.opts.parseSystem();
 		// parse command line and get the result.
 		this.opts = parsedOptions.options;
-    this.argv = parsedOptions.argv; 
+    this.argv = parsedOptions.argv;
 		return [this.argv, this.opts];
   }
 

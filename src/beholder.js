@@ -15,15 +15,15 @@ export async function main() {
     let configure = new Configure();
 
     let configs = configure.setup();
-    /*
-    await raptor.setup(configs).subscribe(
-      log::log.connect,
-      //error::error.connect,
-      //record::record.connect
-    );
-    */
+    for (let testFilePath of configs.tests) {
+      await raptor.subscribe(
+        log::log.connect,
+        //error::error.connect,
+        //record::record.connect
+      ).invoke(configs, testFilePath);
+    }
   } catch(e) {
-    console.error(e);
+    console.error(e, e.stack);
     throw e;
   }
 }
