@@ -1,0 +1,2 @@
+--raptor `where raptor`
+--phase ./.running.phase.js
