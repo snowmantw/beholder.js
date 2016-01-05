@@ -9,6 +9,8 @@ export default class Configure {
 			['r', 'raptor=ARG' , 'where the raptor executable file is'],
 			['p', 'phase=ARG' , 'where the running phase is'],
 			['c', 'config=ARG', 'config file (command line arguments will surpass it)'],
+      ['',  'adb=ARG', 'where the `adb` command is`'],
+      ['m', 'modules=ARG+', 'invoke what modules'],
 			['h', 'help', 'display this help'],
 			['v', 'version', 'show version']
 		])
@@ -26,9 +28,7 @@ export default class Configure {
     let testFilePaths = argv;
     this.validateTestFiles(testFilePaths);
     let configs = this.fromOptions(options);
-    configs.tests = testFilePaths;
-    this.validateRaptor(configs);
-    this.validatePhase(configs);
+    this.validateModuleCommands(configs);
     return configs;
   }
 
@@ -73,6 +73,31 @@ export default class Configure {
     }
   }
 
+  validateAndroidDaemonBus(configs) {
+    try {
+      fs.accessSync(configs.path.adb);
+    } catch(e) {
+      console.error(`Cannot access the Android daemon bus: "${configs.path.adb}"`);
+      throw e;
+    }
+  }
+
+  validateModuleCommands(configs) {
+    for (let moduleIdendity of configs.modules) {
+      switch(moduleIdendity) {
+        case 'raptor':
+          this.validateRaptor(configs);
+          break;
+        case 'phase':
+          this.validatePhase(configs);
+          break;
+        case 'adb':
+          this.validateAndroidDaemonBus(configs);
+          break;
+      }
+    }
+  }
+
   fromOptions(options) {
     let defaultConfigs;
     options.config = options.config;
@@ -85,6 +110,14 @@ export default class Configure {
     // Overwrite the existent one in the default file.
     defaultConfigs.path.phase = options.phase || defaultConfigs.path.phase;
     defaultConfigs.path.raptor = options.raptor || defaultConfigs.path.raptor;
+    defaultConfigs.path.adb = options.adb || defaultConfigs.path.adb;
+    defaultConfigs.modules = options.modules || defaultConfigs.modules;
+    if (!defaultConfigs.modules.includes('raptor')) {
+      defaultConfigs.modules.push('raptor');
+    }
+    if (!defaultConfigs.modules.includes('phase')) {
+      defaultConfigs.modules.push('phase');
+    }
     return defaultConfigs;
   }
 
