@@ -22,15 +22,12 @@ export default class DeviceLog extends Command {
     );
     runTest.unref();
     runTest.stdout.on('data', (data) => {
-console.log('adb logcat stdout: ' + data);
       csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
     });
     runTest.stderr.on('data', (data) => {
-console.log('adb logcat stderr: ' + data);
       csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
     runTest.on('close', (status) => {
-console.log('adb logcat child process exited with code ' + status);
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 

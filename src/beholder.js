@@ -21,31 +21,36 @@ export async function main() {
 
     // Run modules before connecting them.
     //record.run(configs);
-    devicelog.run(configs);
 
     // Passive modules do not need configs: they only need channel results.
     log.run();
-    //error.run();
+    error.run();
 
-    devicelog.subscribe(
-      log::log.connect
-    );
-    console.log('>>>>>>> call consume');
-    log.consume();
-    console.log('>>>>>>> END call consume');
-
-    /*
-    for (let testFilePath of configs.tests) {
-      await raptor.subscribe(
-        log::log.connect,
-        //error::error.connect,
-        //record::record.connect
-      ).run(configs, testFilePath);
+    for (let moduleIdendity of configs.modules) {
+      switch(moduleIdendity) {
+        case 'adb':
+          devicelog.subscribe(
+            log::log.connect,
+            error::error.errorFromLogChannel,
+            error::error.errorFromErrorChannel,
+          ).run(configs);
+          break;
+        case 'raptor':
+          for (let testFilePath of configs.tests) {
+            raptor.subscribe(
+              log::log.connect,
+              error::error.connect,
+              //record::record.connect
+            ).run(configs, testFilePath);
+          }
+          break;
+      }
     }
-    */
+
   } catch(e) {
     console.error('>>>>>>>> ERROR', e, e.stack);
     throw e;
   }
 }
+
 main();

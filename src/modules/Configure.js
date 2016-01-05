@@ -28,6 +28,7 @@ export default class Configure {
     let testFilePaths = argv;
     this.validateTestFiles(testFilePaths);
     let configs = this.fromOptions(options);
+    configs.tests = testFilePaths;
     this.validateModuleCommands(configs);
     return configs;
   }
@@ -126,7 +127,8 @@ export default class Configure {
       path: {
         phase: '',
         raptor: ''
-      }
+      },
+      tests: []
     };
   }
 }

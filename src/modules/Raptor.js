@@ -14,24 +14,22 @@ export default class Raptor extends Command {
 
   run({ path: { phase: phasePath,
                 raptor: raptorPath}}, testFilePath) {
-
+    // TODO: keep the phase path for tests need different phases from different
+    // directories in the future.
     this._channelCloseDeferred = new Defer();
     let runTest = child_process.spawn(
       raptorPath,
-      ['test', phasePath, testFilePath],
+      ['test', testFilePath],
       { detached: true }
     );
     runTest.unref();
     runTest.stdout.on('data', (data) => {
-console.log('stdout: ' + data);
       csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
     });
     runTest.stderr.on('data', (data) => {
-console.log('stderr: ' + data);
       csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
     runTest.on('close', (status) => {
-console.log('child process exited with code ' + status);
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 

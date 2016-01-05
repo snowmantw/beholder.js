@@ -29,7 +29,6 @@ export default class Command {
    * finish the channel.
    */
   subscribe(...subs) {
-    console.log('>>>>>> subscribe: ', subs[0].constructor.name);
     let publication = csp.operations.pub(this._outputChannel, (e) => e.topic);
 
     // To give all subscribers a publication, so that they can do the subscription.
@@ -64,6 +63,7 @@ export default class Command {
    */
   connect(publication, closeHandler) {
     csp.operations.pub.sub(publication, this._topic, this._inputChannel);
+    this.consume();
   }
 
   /**
@@ -73,7 +73,6 @@ export default class Command {
    */
 	consume() {
     csp.go((function*() {
-      console.log('>>>>>>>>>> consume called');
       let value = yield this._inputChannel;
       while (true) {
         this._onTopic(value);
