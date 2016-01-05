@@ -24,8 +24,15 @@ export async function main() {
     devicelog.run(configs);
 
     // Passive modules do not need configs: they only need channel results.
-    //log.run();
+    log.run();
     //error.run();
+
+    devicelog.subscribe(
+      log::log.connect
+    );
+    console.log('>>>>>>> call consume');
+    log.consume();
+    console.log('>>>>>>> END call consume');
 
     /*
     for (let testFilePath of configs.tests) {
@@ -37,7 +44,7 @@ export async function main() {
     }
     */
   } catch(e) {
-    console.error(e, e.stack);
+    console.error('>>>>>>>> ERROR', e, e.stack);
     throw e;
   }
 }

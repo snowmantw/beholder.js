@@ -7,7 +7,8 @@ import Defer from 'Defer';
 export default class Command {
 
   constructor() {
-    this._channel = csp.chan();
+    this._outputChannel = csp.chan();
+    this._inputChannel = csp.chan();
     this._closed = false;
     // See `connect`.
     this._topic = '';
@@ -28,7 +29,8 @@ export default class Command {
    * finish the channel.
    */
   subscribe(...subs) {
-    let publication = csp.operations.pub(this._channel, (e) => e.topic);
+    console.log('>>>>>> subscribe: ', subs[0].constructor.name);
+    let publication = csp.operations.pub(this._outputChannel, (e) => e.topic);
 
     // To give all subscribers a publication, so that they can do the subscription.
     // And give them the handler to close the channel.
@@ -44,7 +46,7 @@ export default class Command {
    */
   close(error) {
     if (!this._closed) {
-      this._channel.close();
+      this._outputChannel.close();
       this._closed = true;
     }
 
@@ -61,7 +63,7 @@ export default class Command {
    * Or, override this method to gain fully control.
    */
   connect(publication, closeHandler) {
-    csp.operations.pub.sub(publication, this._topic, this._logChannel);
+    csp.operations.pub.sub(publication, this._topic, this._inputChannel);
   }
 
   /**
@@ -69,15 +71,18 @@ export default class Command {
    * It needs a inner member 'onTopic' to filter the related data.
    * Or, override this method to gain fully control.
    */
-	*consume() {
-    let value = yield this._logChannel;
-    while (true) {
-      this._onTopic(value);
-      value = yield this._logChannel;
-    }
+	consume() {
+    csp.go((function*() {
+      console.log('>>>>>>>>>> consume called');
+      let value = yield this._inputChannel;
+      while (true) {
+        this._onTopic(value);
+        value = yield this._inputChannel;
+      }
+    }).bind(this));
   }
 
   _onTopic(value) {
-    console.log(this._topic,': ', value.payload);
+    console.log(this.constructor.name, '>>>> ', this._topic,': ', value.payload.toString());
   }
 }

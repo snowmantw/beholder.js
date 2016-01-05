@@ -10,8 +10,6 @@ export default class DeviceLog extends Command {
 
   constructor() {
     super();
-    this._channel = csp.chan();
-    this._closed = false;
   }
 
   run({ path: { adb: adbPath }}, testFilePath) {
@@ -25,15 +23,15 @@ export default class DeviceLog extends Command {
     runTest.unref();
     runTest.stdout.on('data', (data) => {
 console.log('adb logcat stdout: ' + data);
-      csp.putAsync(this._channel, {'topic': 'log', 'payload':  data});
+      csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
     });
     runTest.stderr.on('data', (data) => {
 console.log('adb logcat stderr: ' + data);
-      csp.putAsync(this._channel, {'topic': 'error', 'payload': data})
+      csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
     runTest.on('close', (status) => {
 console.log('adb logcat child process exited with code ' + status);
-      csp.putAsync(this._channel, {'topic': 'status', 'payload': status});
+      csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 
     return this._channelCloseDeferred.promise;

@@ -111,7 +111,7 @@ export default class Configure {
     defaultConfigs.path.phase = options.phase || defaultConfigs.path.phase;
     defaultConfigs.path.raptor = options.raptor || defaultConfigs.path.raptor;
     defaultConfigs.path.adb = options.adb || defaultConfigs.path.adb;
-    defaultConfigs.modules = options.modules || defaultConfigs.modules;
+    defaultConfigs.modules = options.modules || defaultConfigs.modules || [];
     if (!defaultConfigs.modules.includes('raptor')) {
       defaultConfigs.modules.push('raptor');
     }

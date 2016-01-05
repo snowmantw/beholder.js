@@ -1,11 +1,12 @@
 'use strict';
 
 import csp from 'js-csp';
+import Command from 'modules/Command';
 
-export default class Log {
+export default class Log extends Command {
 
   constructor() {
-    this._logChannel = csp.chan();
+    super();
     this._topic = 'log';
   }
 }
