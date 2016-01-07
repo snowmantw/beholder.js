@@ -18,6 +18,8 @@ export async function main() {
     let devicelog = new DeviceLog();
 
     let configs = configure.setup();
+		record.run(configs);
+    /*
 
     // Run modules before connecting them.
     //record.run(configs);
@@ -46,6 +48,7 @@ export async function main() {
           break;
       }
     }
+*/
 
   } catch(e) {
     console.error('>>>>>>>> ERROR', e, e.stack);

@@ -2,6 +2,7 @@
 
 import getopt from 'node-getopt';
 import fs from 'fs';
+import path from 'path';
 
 export default class Configure {
   constructor() {
@@ -10,6 +11,8 @@ export default class Configure {
 			['p', 'phase=ARG' , 'where the running phase is'],
 			['c', 'config=ARG', 'config file (command line arguments will surpass it)'],
       ['',  'adb=ARG', 'where the `adb` command is`'],
+			['',  'record-target-device=ARG', 'where to put the record on the device'],
+			['',  'record-target-console=ARG', 'where to pull the record to the console'],
       ['m', 'modules=ARG+', 'invoke what modules'],
 			['h', 'help', 'display this help'],
 			['v', 'version', 'show version']
@@ -83,6 +86,15 @@ export default class Configure {
     }
   }
 
+	validateRecordConsoleTarget(configs) {
+    try {
+      fs.accessSync(path.dirname(configs.path.record.target.console));
+    } catch(e) {
+      console.error(`Cannot access the target to put the target: "${configs.path.record.target.console}"`);
+      throw e;
+    }
+	}
+
   validateModuleCommands(configs) {
     for (let moduleIdendity of configs.modules) {
       switch(moduleIdendity) {
@@ -95,6 +107,10 @@ export default class Configure {
         case 'adb':
           this.validateAndroidDaemonBus(configs);
           break;
+				case 'screenrecord':
+          this.validateAndroidDaemonBus(configs);
+					this.validateRecordConsoleTarget(configs);
+					break;
       }
     }
   }
@@ -112,6 +128,16 @@ export default class Configure {
     defaultConfigs.path.phase = options.phase || defaultConfigs.path.phase;
     defaultConfigs.path.raptor = options.raptor || defaultConfigs.path.raptor;
     defaultConfigs.path.adb = options.adb || defaultConfigs.path.adb;
+
+		// For ScreenRecord module.
+    defaultConfigs.path.record = defaultConfigs.path.record || {
+			target: { console: null, device: null }
+		};
+		defaultConfigs.path.record.target.device = options['record-target-device'] ||
+			defaultConfigs.path.record.target.device;
+		defaultConfigs.path.record.target.console = options['record-target-console'] ||
+			defaultConfigs.path.record.target.console;
+
     defaultConfigs.modules = options.modules || defaultConfigs.modules || [];
     if (!defaultConfigs.modules.includes('raptor')) {
       defaultConfigs.modules.push('raptor');
