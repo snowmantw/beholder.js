@@ -50,6 +50,7 @@ export default class Command {
     }
 
     if (!error) {
+      console.log('>>>>> close called and promise resolved');
       this._channelCloseDeferred.resolve();
     } else {
       this._channelCloseDeferred.reject(error);

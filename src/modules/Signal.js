@@ -1,5 +1,6 @@
 'use strict';
 
+import csp from 'js-csp';
 import Command from 'modules/Command';
 
 export default class Signal extends Command {
@@ -15,7 +16,8 @@ export default class Signal extends Command {
       'SIGTERM'
     ];
     signals.forEach((signal) => {
-      process.on(signal, function() {
+      process.on(signal, () => {
+        console.log('>>>>>> signal received: ', signal);
         csp.putAsync(this._outputChannel, {'topic': 'status', 'payload':  'termination'});
       });
     });

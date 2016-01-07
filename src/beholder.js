@@ -7,6 +7,7 @@ import Log from 'modules/Log';
 import Error from 'modules/Error';
 import ScreenRecord from 'modules/ScreenRecord';
 import DeviceLog from 'modules/DeviceLog';
+import Signal from 'modules/Signal';
 
 export async function main() {
   try {
@@ -16,9 +17,12 @@ export async function main() {
     let record = new ScreenRecord();
     let configure = new Configure();
     let devicelog = new DeviceLog();
+    let signal = new Signal();
 
     let configs = configure.setup();
-		record.run(configs);
+
+    // Must have signal handling.
+    signal.run();
     /*
 
     // Run modules before connecting them.
@@ -31,6 +35,9 @@ export async function main() {
     for (let moduleIdendity of configs.modules) {
       switch(moduleIdendity) {
         case 'adb':
+          signal.subscribe(
+            devicelog::devicelog.connectSignals
+          );
           devicelog.subscribe(
             log::log.connect,
             error::error.errorFromLogChannel,
@@ -38,6 +45,9 @@ export async function main() {
           ).run(configs);
           break;
         case 'raptor':
+          signal.subscribe(
+            devicelog::devicelog.connectSignals
+          );
           for (let testFilePath of configs.tests) {
             raptor.subscribe(
               log::log.connect,
@@ -45,6 +55,12 @@ export async function main() {
               //record::record.connect
             ).run(configs, testFilePath);
           }
+          break;
+        case 'screenrecord':
+          signal.subscribe(
+            devicelog::devicelog.connectSignals
+          );
+          record.run(configs);
           break;
       }
     }

@@ -1,6 +1,7 @@
 'use strict';
 
 import fs from 'fs';
+import os from 'os';
 import temp from 'temp';
 import csp from 'js-csp';
 import child_process from 'child_process';
@@ -24,13 +25,12 @@ export default class ScreenRecord extends Command {
 						 }}) {
 		this._adbPath = adbPath;
 		this._fetchPreferences(this._preferencesPath);
-    console.log('>>>> call setPreference');
 		this._setPreference();
 		return this._runCommand(deviceTargetPath, consoleTargetPath);
 	}
 
   connectSignals(publication, closeHandler) {
-    csp.operations.pub.sub(publication, this._topic, this._inputChannel);
+    csp.operations.pub.sub(publication, 'status', this._inputChannel);
     this._consumeSignals();
   }
 
@@ -48,7 +48,6 @@ export default class ScreenRecord extends Command {
 
 	_runCommand(deviceTargetPath, consoleTargetPath) {
     this._channelCloseDeferred = new Defer();
-    console.log('>>>> start to record: ', deviceTargetPath, '|', consoleTargetPath);
     let runIt = child_process.spawn(
       this._adbPath,
       ['shell', 'screenrecord', deviceTargetPath],
@@ -56,7 +55,6 @@ export default class ScreenRecord extends Command {
     );
     runIt.unref();
     runIt.stdout.on('data', (data) => {
-console.log('>>>>>> recording the device');
       csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
     });
     runIt.stderr.on('data', (data) => {
@@ -67,15 +65,34 @@ console.log('>>>>>> recording the device');
     });
 
     return this._channelCloseDeferred.promise.then(() => {
-console.log('>>>>>>> pulling the record');
-			child_process.execFileSync(this._adbPath,
-				['pull', deviceTargetPath, consoleTargetPath]);
-		});
+      return new Promise((resolve, reject) => {
+        try {
+        runIt.kill('SIGINT');
+        runIt.on('exit', () => {
+          // TODO: wait the killing done or racing?
+          this._commandDevice('pull', deviceTargetPath, consoleTargetPath);
+          if('darwin' === os.platform()) {
+            // Or the file won't open.
+            this._changeDarwinDefaultGroup(consoleTargetPath);
+          }
+          resolve();
+        });
+        } catch(e) {
+          console.error('Error occurs when handling the pulling');
+          reject(e);
+        }
+      });
+		}).then(() => {
+console.log('>>>>>> so process exit');
+process.exit();
+    }).catch((e) => {
+      console.error(e);
+      throw e;
+    });
 	}
 
 	_setPreference() {
 		let userPreferences = this._fetchPreferences(this._preferencesPath);
-console.log('>>>>> already set it');
 		if (!!userPreferences[this._preferenceName]) {
 			return;  // The preference has been set
 		}
@@ -170,4 +187,8 @@ console.log('>>>>> already set it');
 		eval(strPrefs); //eslint-disable-line
 		return preferences;
 	}
+
+  _changeDarwinDefaultGroup(recordFilePath) {
+    child_process.execSync(`chgrp staff ${recordFilePath}`);
+  }
 }
