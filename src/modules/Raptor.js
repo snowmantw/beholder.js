@@ -17,22 +17,43 @@ export default class Raptor extends Command {
     // TODO: keep the phase path for tests need different phases from different
     // directories in the future.
     this._channelCloseDeferred = new Defer();
-    let runTest = child_process.spawn(
+    let runIt = child_process.spawn(
       raptorPath,
       ['test', testFilePath],
       { detached: true }
     );
-    runTest.unref();
-    runTest.stdout.on('data', (data) => {
+    runIt.unref();
+    runIt.stdout.on('data', (data) => {
       csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
     });
-    runTest.stderr.on('data', (data) => {
+    runIt.stderr.on('data', (data) => {
       csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
-    runTest.on('close', (status) => {
+    runIt.on('close', (status) => {
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 
-    return this._channelCloseDeferred.promise;
+    return this._channelCloseDeferred.promise.then(() => {
+      // After close, kill the adb logcat process.
+      runIt.kill();
+    });
+  }
+
+  connectSignals(publication, closeHandler) {
+    csp.operations.pub.sub(publication, 'status', this._inputChannel);
+    this._consumeSignals();
+  }
+
+	_consumeSignals() {
+    csp.go((function*() {
+      let value = yield this._inputChannel;
+      while (true) {
+        if ('termination' === value.payload) {
+          console.log('>>>>> got signal termination', 'Raptor');
+          this.close();
+        }
+        value = yield this._inputChannel;
+      }
+    }).bind(this));
   }
 }

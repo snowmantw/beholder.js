@@ -1,4 +1,5 @@
 metrics.ldjson
+test-csp-publication/*
 
 # Logs
 logs

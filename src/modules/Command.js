@@ -9,6 +9,8 @@ export default class Command {
   constructor() {
     this._outputChannel = csp.chan();
     this._inputChannel = csp.chan();
+    this._publication = csp.operations.pub(
+      this._outputChannel, (e) => e.topic);
     this._closed = false;
     // See `connect`.
     this._topic = '';
@@ -29,12 +31,10 @@ export default class Command {
    * finish the channel.
    */
   subscribe(...subs) {
-    let publication = csp.operations.pub(this._outputChannel, (e) => e.topic);
-
     // To give all subscribers a publication, so that they can do the subscription.
     // And give them the handler to close the channel.
     subs.forEach((sub) => {
-      sub(publication, this.close.bind(this));
+      sub(this._publication, this.close.bind(this));
     });
     return this;
   }
@@ -50,7 +50,6 @@ export default class Command {
     }
 
     if (!error) {
-      console.log('>>>>> close called and promise resolved');
       this._channelCloseDeferred.resolve();
     } else {
       this._channelCloseDeferred.reject(error);
@@ -64,6 +63,7 @@ export default class Command {
    */
   connect(publication, closeHandler) {
     csp.operations.pub.sub(publication, this._topic, this._inputChannel);
+    // Start to iterate the channel.
     this.consume();
   }
 
@@ -83,6 +83,6 @@ export default class Command {
   }
 
   _onTopic(value) {
-    console.log(this.constructor.name, '>>>> ', this._topic,': ', value.payload.toString());
+    // console.log(this.constructor.name, '>>>> ', this._topic,': ', value.payload.toString());
   }
 }

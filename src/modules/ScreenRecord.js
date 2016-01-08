@@ -39,6 +39,7 @@ export default class ScreenRecord extends Command {
       let value = yield this._inputChannel;
       while (true) {
         if ('termination' === value.payload) {
+          console.log('>>>>> got signal termination', 'ScreenRecord');
           this.close();
         }
         value = yield this._inputChannel;
@@ -84,7 +85,7 @@ export default class ScreenRecord extends Command {
       });
 		}).then(() => {
 console.log('>>>>>> so process exit');
-process.exit();
+//process.exit();
     }).catch((e) => {
       console.error(e);
       throw e;

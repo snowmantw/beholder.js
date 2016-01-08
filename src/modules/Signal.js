@@ -2,6 +2,7 @@
 
 import csp from 'js-csp';
 import Command from 'modules/Command';
+import Defer from 'Defer';
 
 export default class Signal extends Command {
 
@@ -17,9 +18,13 @@ export default class Signal extends Command {
     ];
     signals.forEach((signal) => {
       process.on(signal, () => {
-        console.log('>>>>>> signal received: ', signal);
-        csp.putAsync(this._outputChannel, {'topic': 'status', 'payload':  'termination'});
+        csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'termination'});
       });
+    });
+    this._channelCloseDeferred = new Defer();
+    return this._channelCloseDeferred.promise.then(() => {
+      console.log('>>>>> close Signal handling means to exit');
+      process.exit();
     });
   }
 }
