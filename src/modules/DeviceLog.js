@@ -32,25 +32,13 @@ export default class DeviceLog extends Command {
 
     return this._channelCloseDeferred.promise.then(() => {
       // After close, kill the adb logcat process.
+      // This is the 'stop' method this command has.
+      // Since it mainly forwards to other module,
+      // we only need to kill the listener.
       runIt.kill();
+    }).catch((e) => {
+      console.error(e);
+      throw e;
     });
-  }
-
-  connectSignals(publication, closeHandler) {
-    csp.operations.pub.sub(publication, 'status', this._inputChannel);
-    this._consumeSignals();
-  }
-
-	_consumeSignals() {
-    csp.go((function*() {
-      let value = yield this._inputChannel;
-      while (true) {
-        if ('termination' === value.payload) {
-          console.log('>>>>> got signal termination', 'DeviceLog');
-          this.close();
-        }
-        value = yield this._inputChannel;
-      }
-    }).bind(this));
   }
 }

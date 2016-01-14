@@ -14,6 +14,7 @@ export default class Configure {
 			['',  'record-target-device=ARG', 'where to put the record on the device'],
 			['',  'record-target-console=ARG', 'where to pull the record to the console'],
       ['m', 'modules=ARG+', 'invoke what modules'],
+      ['',  'main-module=ARG', 'default is Raptor; once it ends the process will end, too']
 			['h', 'help', 'display this help'],
 			['v', 'version', 'show version']
 		])
@@ -139,11 +140,17 @@ export default class Configure {
 			defaultConfigs.path.record.target.console;
 
     defaultConfigs.modules = options.modules || defaultConfigs.modules || [];
+    defaultConfigs.modules.__main_module__ = options['main-module'] ||
+      defaultConfigs.modules.__main_module__ || 'raptor';
+
     if (!defaultConfigs.modules.includes('raptor')) {
       defaultConfigs.modules.push('raptor');
     }
     if (!defaultConfigs.modules.includes('phase')) {
       defaultConfigs.modules.push('phase');
+    }
+    if (!defaultConfigs.modules.includes('signal')) {
+      defaultConfigs.modules.push('signal');
     }
     return defaultConfigs;
   }

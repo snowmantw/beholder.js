@@ -6,7 +6,8 @@ import Defer from 'Defer';
 
 export default class Command {
 
-  constructor() {
+  constructor(previousStageInstance) {
+    this._controlChannel = csp.chan();
     this._outputChannel = csp.chan();
     this._inputChannel = csp.chan();
     this._publication = csp.operations.pub(
@@ -14,6 +15,7 @@ export default class Command {
     this._closed = false;
     // See `connect`.
     this._topic = '';
+    this._inheritPreviousStage(previousStageInstance);
   }
 
   /**
@@ -81,6 +83,41 @@ export default class Command {
       }
     }).bind(this));
   }
+
+  connectToController(publication, closeHandler) {
+    this._controllerPublication = publication;
+    csp.operations.pub.sub(publication, 'status', this._controlChannel);
+    this._consumeControlMessage();
+  }
+
+  _consumeControlMessage() {
+    csp.go((function*() {
+      let value = yield this._controlChannel;
+      while (true) {
+        let {type, detail} = value.payload;
+        switch(type) {
+          case 'stagechange':
+            this._onStageChange(detail);
+            break;
+          case 'initialized':
+            this._onInitialized(detail);
+            break;
+        }
+      }
+    }).bind(this));
+  }
+
+  _inheritPreviousStage(instance) {
+
+  }
+
+  _stopListenControlChannel() {
+    csp.operations.pub.unsub(
+      this._controllerPublication, 'status', this._controlChannel);
+  }
+
+  _onStageChange(stage) {}
+  _onInitialized(modules) {}
 
   _onTopic(value) {
     // console.log(this.constructor.name, '>>>> ', this._topic,': ', value.payload.toString());
