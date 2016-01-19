@@ -34,9 +34,8 @@ export default class Command {
    */
   subscribe(...subs) {
     // To give all subscribers a publication, so that they can do the subscription.
-    // And give them the handler to close the channel.
     subs.forEach((sub) => {
-      sub(this._publication, this.close.bind(this));
+      sub(this._publication);
     });
     return this;
   }
@@ -84,7 +83,7 @@ export default class Command {
     }).bind(this));
   }
 
-  connectToController(publication, closeHandler) {
+  connectToController(publication) {
     this._controllerPublication = publication;
     csp.operations.pub.sub(publication, 'status', this._controlChannel);
     this._consumeControlMessage();
@@ -103,6 +102,7 @@ export default class Command {
             this._onInitialized(detail);
             break;
         }
+        value = yield this._controlChannel;
       }
     }).bind(this));
   }
@@ -116,7 +116,11 @@ export default class Command {
       this._controllerPublication, 'status', this._controlChannel);
   }
 
-  _onStageChange(stage) {}
+  _onStageChange(stage) {
+    // Close the default channel before transferring.
+    this.close();
+    console.log('>>>>>> onStageChange: ', stage, this.constructor.name);
+  }
   _onInitialized(modules) {}
 
   _onTopic(value) {

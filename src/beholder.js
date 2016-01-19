@@ -1,85 +1,95 @@
 'use strict';
 
-import Stage from 'modules/Command'
-import Configure from 'modules/Configure'
-import Raptor from 'modules/Raptor';
-import LogRecordingStage from 'modules/LogRecordingStage';
-import Error from 'modules/Error';
-import ScreenRecord from 'modules/ScreenRecord';
-import DeviceLog from 'modules/DeviceLog';
-import Signal from 'modules/Signal';
+import csp from 'js-csp';
+import Configure from 'Configure'
+import { default as Log } from 'modules/Log/RecordingStage';
+//import Raptor from 'routers/Raptor';
+//import Error from 'routers/Error';
+//import ScreenRecord from 'routers/ScreenRecord';
+//import DeviceLog from 'routers/DeviceLog';
+//import Signal from 'routers/Signal';
 
-class Beholder extends Command {
+/**
+ * This launcher & controller module will send initialized
+ * message to all other modules, and then forward stage changes
+ * from the main module. Itself doesn't belong to the command-module
+ * system, but can deal with the protocol.
+ **/
+class Beholder {
 
   constructor() {
-    super();
+    this._outputChannel = csp.chan();
+    this._mainRouterChannel = csp.chan();
     this._signalChannel = csp.chan();
   }
 
   start() {
-    this.modules = {
-      raptor: new Raptor(),
-      log: new LogRecordingStage(),
-      error: new Error(),
-      screenrecord: new ScreenRecord(),
-      configure: new Configure(),
-      devicelog: new DeviceLog(),
-      signal: new Signal()
-    };
+    let configure = new Configure();
     this.configs = configure.setup();
+    this._routers = {
+      devicelog: new DeviceLog(this.configs),
+      log: new Log(this.configs),
+      signal: new Signal(this.configs)
+    };
+    this._initializedRouters();
   }
 
-  _initializeModules() {
-    let mainModule;
+  _initializeRouters() {
+    let mainRouter;
     let initialized = {};
-    let mainModuleIdentity = this.configs.modules.__main_module__;
+    let mainRouterIdentity = this.configs.routers.__main__;
 
-    for (let moduleIdendity of this.configs.modules) {
-      let module = this.modules[moduleIdendity];
-      let afterRun = module.run(this.configs);
-      this.subscribe(module::module.connectToController);
-      initialized[moduleIdendity] = { module, afterRun };
-      if (mainModuleIdentity === moduleIdendity) {
-        mainModule = module;
+    for (let routerIdendity of this.configs.routers) {
+      let router = this.routers[routerIdendity];
+      if (!router) {
+        console.error(`!!!!!!Cannot find router ${routerIdendity} from ${this.configs.routers}`);
+        throw new Error(`Cannot find router ${routerIdendity} from ${this.configsrouterss}`);
+      }
+      this.subscribe(router::router.connectToController);
+      initialized[routerIdendity] = router;
+      router.start();
+      if (mainRouterIdentity === routerIdendity) {
+        mainRouter = router;
       }
     }
-    if (!mainModule) {
-      throw new Error(`Found no main module: ${mainModuleIdentity}`);
+
+    if (!mainRouter) {
+      throw new Error(`Found no main module: ${mainRouterIdentity}`);
     }
-    this._modulesInitialized = initialized;
+    this._routersInitialized = initialized;
 
     // So that modules could connect to each other by themselves.
+    // TODO::::: problematic line
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'initialized', 'detail': initialized} });
 
     // Controller needs to listen to signals.
-    this.modules.signal.subscribe(this::this._connectToSignals);
-    mainModule.subscribe(this::this._connectToMainModule);
-
-    // TODO: the main need to be connected as well.
-    // For example, the Raptor module.
-    // Although it needs a stage transferring, rather than redirect to the termination.
+    //this.routers.signal.subscribe(this::this._connectToSignals);
+    mainRouter.subscribe(this::this._connectToMainRouter);
   }
 
   async _terminate() {
-    let waitAllTerminated = Promise.all(Object.keys(this._modulesInitialized)
-        .map((moduleIdendity) => {
-          let { module, afterRun } = this._modulesInitialized[moduleIdendity];
+    let waitAllTerminated = Promise.all(Object.keys(this._routersInitialized)
+        .map((routerIdendity) => {
+          let { module, afterRun } = this._routersInitialized[routerIdendity];
           return afterRun;
         }));
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'stagechange', 'detail': 'termination'} });
     await waitAllTerminated;
-    process.exit(1);   // aborted; so it's a failure.
+    // TODO: need to distinguish the difference between abnormal and normal termination ?
+    process.exit(0);
   }
 
-  _connectToMainModule(publication, closeHandler) {
-    csp.operations.pub.sub(publication, 'stage', this._signalChannel);
+  _connectToMainRouter(publication, transferredDeferred) {
+    csp.operations.pub.sub(publication, 'status', this._mainRouterChannel);
+    this._mainRouterTransferredDeferred = transferredDeferred;
     this._consumeStageChanges();
   }
 
   _connectToSignals(publication, closeHandler) {
     csp.operations.pub.sub(publication, 'status', this._signalChannel);
+    this._signalCloseHandler = closeHandler;
     this._consumeSignals();
   }
 
@@ -87,36 +97,57 @@ class Beholder extends Command {
     csp.go((function*() {
       let value = yield this._signalChannel;
       while (true) {
+        console.log('>>>>> consume signal');
         if ('termination' === value.payload) {
           console.log('>>>>> got signal termination', 'Controller');
           this._terminate();
         }
-        value = yield this._inputChannel;
+        value = yield this._signalChannel;
       }
     }).bind(this));
   }
 
   /**
    * Main module should fire stage change messages, so other modules could
-   * change their stage as well. And since modules have all the initialized
+   * change their stage as well. And since modules have all the list of initialized
    * ones, they can handle the re-subscription issues by themselves.
    */
   _consumeStageChanges() {
     csp.go((function*() {
-      let value = yield this._signalChannel;
+      let value = yield this._mainRouterChannel;
       while (true) {
-        this._dispatchStage(value.payload);
-        value = yield this._inputChannel;
+        console.log('>>>>> consume main');
+        if ('stagechange' === valule.payload.type) {
+          this._dispatchStage(value.payload);
+        }
+        value = yield this._mainRouterChannel;
       }
     }).bind(this));
   }
 
-  _dispatchStage(stage) {
+  /**
+   * Re-dispatch again. Since this is a Facade.
+   */
+  _dispatchStage(stagePayload) {
     csp.putAsync(this._outputChannel, {'topic': 'status',
-      'payload': {'type': 'stagechange', 'detail': stage} });
+      'payload': stagePayload });
   }
 }
 
+let beholder = new Beholder();
+beholder.start();
+//
+/*
+let configure = new Configure();
+let configs = configure.setup();
+let signal = new Signal();
+let devicelog = new DeviceLog();
+devicelog.run(configs);
+signal.run();
+*/
+//setTimeout(() => {}, 30 * 1000);
+
+/*
 export async function main() {
   try {
     let raptor = new Raptor();
@@ -152,7 +183,6 @@ export async function main() {
             error::error.errorFromErrorChannel,
           ).run(configs);
           break;
-        /*
         case 'raptor':
           signal.subscribe(
             raptor::raptor.connectSignals
@@ -165,7 +195,6 @@ export async function main() {
             ).run(configs, testFilePath);
           }
           break;
-          */
         case 'screenrecord':
           signal.subscribe(
             record::record.connectSignals
@@ -182,3 +211,4 @@ export async function main() {
 }
 
 main();
+*/

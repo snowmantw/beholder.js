@@ -3,7 +3,6 @@
 import csp from 'js-csp';
 import Command from 'modules/Command';
 
-import CollectingStage from 'modules/Log/CollectingStage';
 import TerminatingStage from 'modules/Log/TerminatingStage';
 
 /**

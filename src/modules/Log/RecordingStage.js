@@ -13,9 +13,7 @@ import TerminatingStage from 'modules/Log/TerminatingStage';
 export default class RecordingStage extends Command {
   constructor() {
     super();
-
     this._record = new LogRecord();
-
     this._logsPublication = null;
     this._topicLog = 'log';
     this._devicelogChannel = csp.chan();
