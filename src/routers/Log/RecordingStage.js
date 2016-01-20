@@ -23,18 +23,16 @@ export default class RecordingStage extends Router {
   }
 
   _onInitialized(initializedRouters) {
-    super();
+    super._onInitialized(arguments);
     this._routers.devicelog.subscribe(this::this._connectToDeviceLog);
   }
 
   _onStageChange(stage) {
     switch(stage) {
       case 'collecting':
-        this.stop();
         this._transferToCollectingStage();
         break;
       case 'terminating':
-        this.stop();
         this._transferToTerminatingStage();
         break;
     }
@@ -58,7 +56,7 @@ export default class RecordingStage extends Router {
   _consumeLogs() {
     csp.go((function*() {
       let value = yield this._inputChannel;
-      while (true) {
+      while (csp.CLOSED !== value) {
         this._onLog(value);
         value = yield this._inputChannel;
       }

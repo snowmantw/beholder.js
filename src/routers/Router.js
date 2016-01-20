@@ -44,7 +44,7 @@ export default class Router {
 
   subscribe(...subs) {
     subs.forEach((sub) => {
-      sub(this._publication, transferredDeferred.promise);
+      sub(this._publication, this._transferredDeferred.promise);
     });
     return this;
   }
@@ -58,7 +58,7 @@ export default class Router {
   _consumeControlMessage() {
     csp.go((function*() {
       let value = yield this._controlChannel;
-      while (true) {
+      while (csp.CLOSED !== value) {
         let {type, detail} = value.payload;
         switch(type) {
           case 'initialized':

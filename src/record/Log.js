@@ -1,6 +1,6 @@
 'use strict';
 
-export default class LogRecord {
+export default class Log {
   constructor() {
     this._store = [];
   }

@@ -2,12 +2,12 @@
 
 import csp from 'js-csp';
 import Configure from 'Configure'
-import { default as Log } from 'modules/Log/RecordingStage';
+import { default as Log } from 'routers/Log/RecordingStage';
 //import Raptor from 'routers/Raptor';
 //import Error from 'routers/Error';
 //import ScreenRecord from 'routers/ScreenRecord';
-//import DeviceLog from 'routers/DeviceLog';
-//import Signal from 'routers/Signal';
+import { default as DeviceLog } from 'routers/DeviceLog/RecordingStage';
+import { default as Signal } from 'routers/Signal/RecordingStage';
 
 /**
  * This launcher & controller module will send initialized
@@ -21,6 +21,9 @@ class Beholder {
     this._outputChannel = csp.chan();
     this._mainRouterChannel = csp.chan();
     this._signalChannel = csp.chan();
+
+    this._publication = csp.operations.pub(
+      this._outputChannel, (e) => e.topic);
   }
 
   start() {
@@ -31,7 +34,7 @@ class Beholder {
       log: new Log(this.configs),
       signal: new Signal(this.configs)
     };
-    this._initializedRouters();
+    this._initializeRouters();
   }
 
   _initializeRouters() {
@@ -39,15 +42,17 @@ class Beholder {
     let initialized = {};
     let mainRouterIdentity = this.configs.routers.__main__;
 
+    this._transferredPromises = [];
+
     for (let routerIdendity of this.configs.routers) {
-      let router = this.routers[routerIdendity];
+      let router = this._routers[routerIdendity];
       if (!router) {
         console.error(`!!!!!!Cannot find router ${routerIdendity} from ${this.configs.routers}`);
-        throw new Error(`Cannot find router ${routerIdendity} from ${this.configsrouterss}`);
+        throw new Error(`Cannot find router ${routerIdendity} from ${this.configs.routers}`);
       }
-      this.subscribe(router::router.connectToController);
+      router.connectToController(this._publication);
       initialized[routerIdendity] = router;
-      router.start();
+      this._transferredPromises.push(router.start());
       if (mainRouterIdentity === routerIdendity) {
         mainRouter = router;
       }
@@ -64,16 +69,12 @@ class Beholder {
       'payload': {'type': 'initialized', 'detail': initialized} });
 
     // Controller needs to listen to signals.
-    //this.routers.signal.subscribe(this::this._connectToSignals);
-    mainRouter.subscribe(this::this._connectToMainRouter);
+    this._routers.signal.subscribe(this::this._connectToSignals);
+    //mainRouter.subscribe(this::this._connectToMainRouter);
   }
 
   async _terminate() {
-    let waitAllTerminated = Promise.all(Object.keys(this._routersInitialized)
-        .map((routerIdendity) => {
-          let { module, afterRun } = this._routersInitialized[routerIdendity];
-          return afterRun;
-        }));
+    let waitAllTerminated = Promise.all(this._transferredPromises);
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'stagechange', 'detail': 'termination'} });
     await waitAllTerminated;
@@ -87,17 +88,17 @@ class Beholder {
     this._consumeStageChanges();
   }
 
-  _connectToSignals(publication, closeHandler) {
-    csp.operations.pub.sub(publication, 'status', this._signalChannel);
-    this._signalCloseHandler = closeHandler;
+  _connectToSignals(publication, transferredDeferred) {
+    csp.operations.pub.sub(publication, 'data', this._signalChannel);
+    this._signalTransferredDeferred = transferredDeferred;
     this._consumeSignals();
   }
 
 	_consumeSignals() {
     csp.go((function*() {
       let value = yield this._signalChannel;
-      while (true) {
-        console.log('>>>>> consume signal');
+      while (csp.CLOSED !== value) {
+        console.log('>>>>> consume signal: ', value);
         if ('termination' === value.payload) {
           console.log('>>>>> got signal termination', 'Controller');
           this._terminate();
@@ -115,7 +116,7 @@ class Beholder {
   _consumeStageChanges() {
     csp.go((function*() {
       let value = yield this._mainRouterChannel;
-      while (true) {
+      while (csp.CLOSED !== value) {
         console.log('>>>>> consume main');
         if ('stagechange' === valule.payload.type) {
           this._dispatchStage(value.payload);
