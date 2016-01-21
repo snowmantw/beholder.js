@@ -5,8 +5,8 @@ import Router from 'routers/Router';
 
 export default class TerminatingStage extends Router {
 
-  constructor() {
-    super(arguments);
+  constructor(previousStageInstance) {
+    super(previousStageInstance);
     this._record = this._previousStage._record;
   }
 

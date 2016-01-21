@@ -9,13 +9,15 @@ import { default as LogRecord } from 'record/Log';
 
 export default class RecordingStage extends Router {
 
-  constructor() {
-    super(arguments);
+  constructor(configsInstance) {
+    super(configsInstance);
     // Router name: 'log'
     this._name = 'log';
 
     // The devicelog router will emit log/error.
     this._deviceLogTopic = 'log';
+
+    console.log('>>>> log constructed');
   }
 
   start() {
@@ -23,8 +25,10 @@ export default class RecordingStage extends Router {
   }
 
   _onInitialized(initializedRouters) {
-    super._onInitialized(arguments);
+    super._onInitialized.apply(this, arguments);
+    console.log('>>>>>> initialized called in Log recording', Object.keys(this._routers));
     this._routers.devicelog.subscribe(this::this._connectToDeviceLog);
+    console.log('>>> subscribe devicelog channel');
   }
 
   _onStageChange(stage) {
@@ -39,6 +43,7 @@ export default class RecordingStage extends Router {
   }
 
   _onLog(log) {
+    console.log('>>>>> redirected from DeviceLog');
     this._record.push(log);
   }
 

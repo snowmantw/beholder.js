@@ -8,7 +8,7 @@ import Defer from 'Defer';
 export default class RecordingStage extends Router {
 
   constructor(configsInstance) {
-    super(arguments);
+    super(configsInstance);
     this.configs = configsInstance;
     this._adbPath = this.configs.path.adb;
     this._name = 'devicelog';
@@ -24,7 +24,6 @@ export default class RecordingStage extends Router {
     console.log('>>>>> device log runs spawn');
     runIt.unref();
     runIt.stdout.on('data', (data) => {
-      console.log('>>>>> data adb');
       csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
     });
     runIt.stderr.on('data', (data) => {
@@ -58,7 +57,7 @@ export default class RecordingStage extends Router {
   }
 
   _onInitialized(initializedRouters) {
-    super._onInitialized(arguments);
+    super._onInitialized.apply(this, arguments);
   }
 
   _onStageChange(stage) {
@@ -71,6 +70,7 @@ export default class RecordingStage extends Router {
         break;
     }
   }
+
   _transferToCollectingStage() {
     // Don't actually transfer since we will do nothing in that stage.
     let deferred = this._transferredDeferred;

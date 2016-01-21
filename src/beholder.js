@@ -46,11 +46,13 @@ class Beholder {
 
     for (let routerIdendity of this.configs.routers) {
       let router = this._routers[routerIdendity];
+      console.log('>>>> router.name: ', router._name, this.configs.routers);
       if (!router) {
         console.error(`!!!!!!Cannot find router ${routerIdendity} from ${this.configs.routers}`);
         throw new Error(`Cannot find router ${routerIdendity} from ${this.configs.routers}`);
       }
       router.connectToController(this._publication);
+      console.log('>>>> register: ', routerIdendity);
       initialized[routerIdendity] = router;
       this._transferredPromises.push(router.start());
       if (mainRouterIdentity === routerIdendity) {
@@ -65,12 +67,15 @@ class Beholder {
 
     // So that modules could connect to each other by themselves.
     // TODO::::: problematic line
+    console.log('>>>>> before sending the initialized: ', Object.keys(initialized));
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'initialized', 'detail': initialized} });
 
+    console.log('>>>> beholder sent the initialized message');
+
     // Controller needs to listen to signals.
     this._routers.signal.subscribe(this::this._connectToSignals);
-    //mainRouter.subscribe(this::this._connectToMainRouter);
+    mainRouter.subscribe(this::this._connectToMainRouter);
   }
 
   async _terminate() {
@@ -140,79 +145,3 @@ class Beholder {
 
 let beholder = new Beholder();
 beholder.start();
-//
-/*
-let configure = new Configure();
-let configs = configure.setup();
-let signal = new Signal();
-let devicelog = new DeviceLog();
-devicelog.run(configs);
-signal.run();
-*/
-//setTimeout(() => {}, 30 * 1000);
-
-/*
-export async function main() {
-  try {
-    let raptor = new Raptor();
-    let log = new LogRecordingStage();
-    let error = new Error();
-    let record = new ScreenRecord();
-    let configure = new Configure();
-    let devicelog = new DeviceLog();
-    let signal = new Signal();
-
-    let configs = configure.setup();
-
-    // Must have signal handling.
-    signal.run();
-
-    // Run modules before connecting them.
-    //record.run(configs);
-
-    // Passive modules do not need configs: they only need channel results.
-    log.run();
-    error.run();
-
-    for (let moduleIdendity of configs.modules) {
-      switch(moduleIdendity) {
-
-        case 'adb':
-          signal.subscribe(
-            devicelog::devicelog.connectSignals
-          );
-          devicelog.subscribe(
-            log::log.connect,
-            error::error.errorFromLogChannel,
-            error::error.errorFromErrorChannel,
-          ).run(configs);
-          break;
-        case 'raptor':
-          signal.subscribe(
-            raptor::raptor.connectSignals
-          );
-          for (let testFilePath of configs.tests) {
-            raptor.subscribe(
-              log::log.connect,
-              error::error.connect,
-              //record::record.connect
-            ).run(configs, testFilePath);
-          }
-          break;
-        case 'screenrecord':
-          signal.subscribe(
-            record::record.connectSignals
-          );
-          record.run(configs);
-          break;
-      }
-    }
-
-  } catch(e) {
-    console.error('>>>>>>>> ERROR', e, e.stack);
-    throw e;
-  }
-}
-
-main();
-*/

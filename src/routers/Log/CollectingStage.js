@@ -7,8 +7,8 @@ import TerminatingStage from 'routers/Log/TerminatingStage';
 // TODO: We need to do time alignment in this stage when it's ready.
 export default class CollectingStage extends Router {
 
-  constructor() {
-    super(arguments);
+  constructor(previousStageInstance) {
+    super(previousStageInstance);
     this._name = this._previousStage._name;
     this._record = this._previousStage._record;
   }

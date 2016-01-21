@@ -7,19 +7,19 @@ import Defer from 'Defer';
 export default class RecordingStage extends Router {
 
   constructor(configsInstance) {
-    super(arguments);
+    super(configsInstance);
     this.configs = configsInstance;
-    this._name = 'devicelog';
+    this._name = 'signal';
   }
 
   start() {
-    let signals = [
+    let terminatingSignals = [
       'SIGHUP',
-      'SIGINT',
-      'SIGTERM'
+      'SIGTERM',
+      'SIGINT'
     ];
     console.log('>>> Signals run');
-    signals.forEach((signal) => {
+    terminatingSignals.forEach((signal) => {
       console.log('>>>> book: ', signal);
       process.on(signal, () => {
         console.log('>>>>>> send kill signal');
@@ -27,13 +27,12 @@ export default class RecordingStage extends Router {
       });
     });
 
-    this._transferredDeferred.promise =
-      this._transferredDeferred.promise.then(() => {
-        process.exit();
-      }).catch((e) => {
-        console.error(e);
-        throw e;
-      });
+    // XXX: only for test.
+    process.stdin.on('end', function() {
+      console.log('>>>>>> send dummy stagechange');
+      csp.putAsync(this._outputChannel, {'topic': 'status', 'payload':  'stagechange'});
+    });
+
     return this._transferredDeferred.promise;
   }
 
@@ -45,7 +44,7 @@ export default class RecordingStage extends Router {
   }
 
   _onInitialized(initializedRouters) {
-    super._onInitialized(arguments) ;
+    super._onInitialized.apply(this, arguments) ;
   }
 
   _onStageChange(stage) {

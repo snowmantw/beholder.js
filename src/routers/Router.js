@@ -60,14 +60,15 @@ export default class Router {
       let value = yield this._controlChannel;
       while (csp.CLOSED !== value) {
         let {type, detail} = value.payload;
-        switch(type) {
+        switch(value.payload.type) {
           case 'initialized':
+        console.log('>>>>>>>> value of control: ', Object.keys(value.payload.detail), Object.keys(detail));
             this._onInitialized(detail);
             break;
           case 'stagechange':
             this._stopListenToControlChannel();
             this._closeChannels();
-            this._onStageChange(detail);
+            this._onStageChange(value.payload.detail);
             break;
         }
         value = yield this._controlChannel;
@@ -76,7 +77,9 @@ export default class Router {
   }
 
   _onInitialized(initializedRouters) {
+    console.log('>>>>>> default onInitialized ', Object.keys(initializedRouters));
     this._routers = initializedRouters;
+    console.log('>>>>>> (confirm) default onInitialized ', Object.keys(this._routers));
   }
 
   /**
