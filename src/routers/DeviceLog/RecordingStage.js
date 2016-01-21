@@ -75,13 +75,13 @@ export default class RecordingStage extends Router {
     // Don't actually transfer since we will do nothing in that stage.
     let deferred = this._transferredDeferred;
     this._transferredDeferred = new Defer();
-    deferred.promise.resolve();
+    deferred.resolve();
   }
 
   _transferToTerminatingStage() {
     // Don't actually transfer since we will do nothing in that stage.
     let deferred = this._transferredDeferred;
     this._transferredDeferred = new Defer();
-    deferred.promise.resolve();
+    deferred.resolve();
   }
 }

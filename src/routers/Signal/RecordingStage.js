@@ -23,7 +23,7 @@ export default class RecordingStage extends Router {
       console.log('>>>> book: ', signal);
       process.on(signal, () => {
         console.log('>>>>>> send kill signal');
-        csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'termination'});
+        csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
       });
     });
 
@@ -62,13 +62,13 @@ export default class RecordingStage extends Router {
     // Don't actually transfer since we will do nothing in that stage.
     let deferred = this._transferredDeferred;
     this._transferredDeferred = new Defer();
-    deferred.promise.resolve();
+    deferred.resolve();
   }
 
   _transferToTerminatingStage() {
     // Don't actually transfer since we will do nothing in that stage.
     let deferred = this._transferredDeferred;
     this._transferredDeferred = new Defer();
-    deferred.promise.resolve();
+    deferred.resolve();
   }
 }

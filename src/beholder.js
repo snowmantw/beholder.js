@@ -75,10 +75,13 @@ class Beholder {
 
   async _terminate() {
     let waitAllTerminated = Promise.all(this._transferredPromises);
+    console.log('>>>> terminating sent');
     csp.putAsync(this._outputChannel, {'topic': 'status',
-      'payload': {'type': 'stagechange', 'detail': 'termination'} });
+      'payload': {'type': 'stagechange', 'detail': 'terminating'} });
     await waitAllTerminated;
-    // TODO: need to distinguish the difference between abnormal and normal termination ?
+
+    console.log('>>>> after wait it');
+    // TODO: need to distinguish the difference between abnormal and normal terminating ?
     process.exit(0);
   }
 
@@ -99,8 +102,8 @@ class Beholder {
       let value = yield this._signalChannel;
       while (csp.CLOSED !== value) {
         console.log('>>>>> consume signal: ', value);
-        if ('termination' === value.payload) {
-          console.log('>>>>> got signal termination', 'Controller');
+        if ('terminating' === value.payload) {
+          console.log('>>>>> got signal terminating', 'Controller');
           this._terminate();
         }
         value = yield this._signalChannel;
