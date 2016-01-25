@@ -43,7 +43,7 @@ export default class RecordingStage extends Router {
   }
 
   _onLog(log) {
-    console.log('>>>>> redirected from DeviceLog');
+    //console.log('>>>>> redirected from DeviceLog');
     this._record.push(log);
   }
 

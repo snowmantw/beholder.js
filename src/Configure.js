@@ -10,7 +10,8 @@ export default class Configure {
 			['r', 'raptor=ARG' , 'where the raptor executable file is'],
 			['p', 'phase=ARG' , 'where the running phase is'],
 			['c', 'config=ARG', 'config file (command line arguments will surpass it)'],
-      ['',  'adb=ARG', 'where the `adb` command is`'],
+      ['',  'adb=ARG', 'where the `adb` command is'],
+      ['',  'ffmpeg=ARG', 'where the `ffmpeg` command is'],
 			['',  'record-target-device=ARG', 'where to put the record on the device'],
 			['',  'record-target-console=ARG', 'where to pull the record to the console'],
       ['r', 'routers=ARG+', 'invoke what routers'],
@@ -88,6 +89,15 @@ export default class Configure {
     }
   }
 
+  validateFFMPEG(configs) {
+    try {
+      fs.accessSync(configs.path.ffmpeg);
+    } catch(e) {
+      console.error(`Cannot access the FFMPEG: "${configs.path.ffmpeg}"`);
+      throw e;
+    }
+  }
+
 	validateRecordConsoleTarget(configs) {
     try {
       fs.accessSync(path.dirname(configs.path.record.target.console));
@@ -98,8 +108,8 @@ export default class Configure {
 	}
 
   validateModuleCommands(configs) {
-    for (let moduleIdendity of configs.routers) {
-      switch(moduleIdendity) {
+    for (let routerIdendity of configs.routers) {
+      switch(routerIdendity) {
         case 'raptor':
           this.validateRaptor(configs);
           break;
@@ -110,6 +120,7 @@ export default class Configure {
           this.validateAndroidDaemonBus(configs);
           break;
 				case 'screenrecord':
+          this.validateFFMPEG(configs);
           this.validateAndroidDaemonBus(configs);
 					this.validateRecordConsoleTarget(configs);
 					break;
@@ -130,6 +141,7 @@ export default class Configure {
     defaultConfigs.path.phase = options.phase || defaultConfigs.path.phase;
     defaultConfigs.path.raptor = options.raptor || defaultConfigs.path.raptor;
     defaultConfigs.path.adb = options.adb || defaultConfigs.path.adb;
+    defaultConfigs.path.ffmpeg = options.ffmpeg || defaultConfigs.path.ffmpeg;
 
 		// For ScreenRecord module.
     defaultConfigs.path.record = defaultConfigs.path.record || {

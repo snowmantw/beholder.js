@@ -36,17 +36,18 @@ export default class RecordingStage extends Router {
     });
     console.log('>>>>> device log runs spawn done');
 
-  this._transferredDeferred.promise =
-    this._transferredDeferred.promise.then(() => {
-      // After close, kill the adb logcat process.
-      // This is the 'stop' method this command has.
-      // Since it mainly forwards to other module,
-      // we only need to kill the listener.
-      runIt.kill();
-    }).catch((e) => {
-      console.error(e);
-      throw e;
-    });
+    this._transferredDeferred.promise =
+      this._transferredDeferred.promise.then(() => {
+        // After close, kill the adb logcat process.
+        // This is the 'stop' method this command has.
+        // Since it mainly forwards to other module,
+        // we only need to kill the listener.
+        runIt.kill();
+      }).catch((e) => {
+        console.error(e);
+        throw e;
+      });
+    this._transferredDeferred.promise;
   }
 
   stop() {

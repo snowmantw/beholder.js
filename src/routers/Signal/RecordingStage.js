@@ -10,6 +10,7 @@ export default class RecordingStage extends Router {
     super(configsInstance);
     this.configs = configsInstance;
     this._name = 'signal';
+    this._interrupted = 0;
   }
 
   start() {
@@ -22,15 +23,17 @@ export default class RecordingStage extends Router {
     terminatingSignals.forEach((signal) => {
       console.log('>>>> book: ', signal);
       process.on(signal, () => {
-        console.log('>>>>>> send kill signal');
-        csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
+        this._interrupted += 1;
+        console.log('>>>>>> send kill signal', this._interrupted);
+        if (1 === this._interrupted) {
+          csp.putAsync(this._outputChannel, {'topic': 'status',
+            'payload':  {'type': 'stagechange', 'detail': 'collecting'}});
+        } else if (2 === this._interrupted) {
+          csp.putAsync(this._outputChannel, {'topic': 'status',
+            'payload':  {'type': 'stagechange', 'detail': 'terminating'}});
+        }
+        //csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
       });
-    });
-
-    // XXX: only for test.
-    process.stdin.on('end', function() {
-      console.log('>>>>>> send dummy stagechange');
-      csp.putAsync(this._outputChannel, {'topic': 'status', 'payload':  'stagechange'});
     });
 
     return this._transferredDeferred.promise;

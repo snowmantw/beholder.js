@@ -20,6 +20,8 @@ export default class Router {
     // Only when all transferring stuff done, this Defer will be resolved.
     this._transferredDeferred = new Defer();
     this._consumeControlMessage();
+
+    this.stagePending = this._transferredDeferred;
   }
 
   /**
@@ -62,7 +64,6 @@ export default class Router {
         let {type, detail} = value.payload;
         switch(value.payload.type) {
           case 'initialized':
-        console.log('>>>>>>>> value of control: ', Object.keys(value.payload.detail), Object.keys(detail));
             this._onInitialized(detail);
             break;
           case 'stagechange':
@@ -77,9 +78,7 @@ export default class Router {
   }
 
   _onInitialized(initializedRouters) {
-    console.log('>>>>>> default onInitialized ', Object.keys(initializedRouters));
     this._routers = initializedRouters;
-    console.log('>>>>>> (confirm) default onInitialized ', Object.keys(this._routers));
   }
 
   /**
@@ -104,7 +103,10 @@ export default class Router {
     // Extend this procedure if it's necessary.
     let nextStage = new routerStageClass(this);
     this._routers[this._name] = nextStage;
+    this._transferredDeferred.promise =
+      this._transferredDeferred.promise.then(() => {
+        nextStage.start();
+      });
     this._transferredDeferred.resolve();
-    nextStage.start();
   }
 }

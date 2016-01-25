@@ -5,7 +5,7 @@ import Configure from 'Configure'
 import { default as Log } from 'routers/Log/RecordingStage';
 //import Raptor from 'routers/Raptor';
 //import Error from 'routers/Error';
-//import ScreenRecord from 'routers/ScreenRecord';
+import { default as ScreenRecord } from 'routers/ScreenRecord/RecordingStage';
 import { default as DeviceLog } from 'routers/DeviceLog/RecordingStage';
 import { default as Signal } from 'routers/Signal/RecordingStage';
 
@@ -30,6 +30,7 @@ class Beholder {
     let configure = new Configure();
     this.configs = configure.setup();
     this._routers = {
+      screenrecord: new ScreenRecord(this.configs),
       devicelog: new DeviceLog(this.configs),
       log: new Log(this.configs),
       signal: new Signal(this.configs)
@@ -66,7 +67,6 @@ class Beholder {
     this._routersInitialized = initialized;
 
     // So that modules could connect to each other by themselves.
-    // TODO::::: problematic line
     console.log('>>>>> before sending the initialized: ', Object.keys(initialized));
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'initialized', 'detail': initialized} });
@@ -75,7 +75,7 @@ class Beholder {
 
     // Controller needs to listen to signals.
     this._routers.signal.subscribe(this::this._connectToSignals);
-    mainRouter.subscribe(this::this._connectToMainRouter);
+    //mainRouter.subscribe(this::this._connectToMainRouter);
   }
 
   async _terminate() {
@@ -97,6 +97,7 @@ class Beholder {
   }
 
   _connectToSignals(publication, transferredDeferred) {
+csp.operations.pub.sub(publication, 'status', this._signalChannel);
     csp.operations.pub.sub(publication, 'data', this._signalChannel);
     this._signalTransferredDeferred = transferredDeferred;
     this._consumeSignals();
@@ -107,9 +108,14 @@ class Beholder {
       let value = yield this._signalChannel;
       while (csp.CLOSED !== value) {
         console.log('>>>>> consume signal: ', value);
-        if ('terminating' === value.payload) {
+        if ('terminating' === value.payload.type) {
           console.log('>>>>> got signal terminating', 'Controller');
           this._terminate();
+        }
+
+        if ('stagechange' === value.payload.type) {
+          console.log('>>>>>> stagechange to dispatch via Signal');
+          this._dispatchStage(value.payload);
         }
         value = yield this._signalChannel;
       }
@@ -126,7 +132,7 @@ class Beholder {
       let value = yield this._mainRouterChannel;
       while (csp.CLOSED !== value) {
         console.log('>>>>> consume main');
-        if ('stagechange' === valule.payload.type) {
+        if ('stagechange' === value.payload.type) {
           this._dispatchStage(value.payload);
         }
         value = yield this._mainRouterChannel;
@@ -137,9 +143,28 @@ class Beholder {
   /**
    * Re-dispatch again. Since this is a Facade.
    */
-  _dispatchStage(stagePayload) {
+  async _dispatchStage(stagePayload) {
+    try {
+    console.log('>>>> dispatch');
+    let pendingPromises = this._fetchPendingPromises();
+    console.log('>>>>>> pendingPromises length: ', pendingPromises.length);
+    let waitPendingPromises = Promise.all(pendingPromises);
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': stagePayload });
+    await waitPendingPromises;
+    console.log(`>>>> [${JSON.stringify(stagePayload)}]: after waiting`);
+    } catch(e) {
+    console.error(e);
+    }
+  }
+
+  _fetchPendingPromises() {
+    let promises = [];
+    for (let routerIdendity of this.configs.routers) {
+      let router = this._routers[routerIdendity];
+      promises.push(router.stagePending.promise);
+    }
+    return promises;
   }
 }
 
