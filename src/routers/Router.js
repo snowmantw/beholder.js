@@ -8,24 +8,24 @@ export default class Router {
   /**
    * After constructor this router should be able to listen to control messages.
    */
-  constructor(previousStageInstance) {
+  constructor(configs) {
+    this.configs = configs;
     this._name = '__router__';  // Extend by client.
     this._controlChannel = csp.chan();
     this._outputChannel = csp.chan();
     this._inputChannel = csp.chan();
     this._publication = csp.operations.pub(
       this._outputChannel, (e) => e.topic);
-    this._previousStage = previousStageInstance;
 
-    // Only when all transferring stuff done, this Defer will be resolved.
-    this._transferredDeferred = new Defer();
+    // Every step of this Defer's promise would be a stage method.
+    this._stages = new Defer();
     this._consumeControlMessage();
-
-    this.stagePending = this._transferredDeferred;
   }
 
   /**
    * After started the router should be able to emit message to the output channel.
+   * The router should concat the starting stage to the stages defer, and then
+   * resolve it to kick-off the whole process.
    */
   start() {
     throw new Error('Instance should extend this method.');
@@ -46,7 +46,7 @@ export default class Router {
 
   subscribe(...subs) {
     subs.forEach((sub) => {
-      sub(this._publication, this._transferredDeferred.promise);
+      sub(this._publication, this._stages.promise);
     });
     return this;
   }
@@ -66,9 +66,16 @@ export default class Router {
           case 'initialized':
             this._onInitialized(detail);
             break;
+          case 'finalize':  // After the latest stage to resolve that stage promise.
+            this._stopListenToControlChannel();
+            this._closeChannels();
+            this._stopCurrentStage();
+            break;
           case 'stagechange':
             this._stopListenToControlChannel();
             this._closeChannels();
+            this._stopCurrentStage();
+            // Should dispatch & start a new stage.
             this._onStageChange(value.payload.detail);
             break;
         }
@@ -80,7 +87,6 @@ export default class Router {
   _onInitialized(initializedRouters) {
     this._routers = initializedRouters;
   }
-
   /**
    * Only intermediate stages need to implement this method, since it doesn't exit
    * via the `stop` method, but the state transferring.
@@ -94,19 +100,37 @@ export default class Router {
       this._controllerPublication, 'status', this._controlChannel);
   }
 
+  _stopCurrentStage() {
+    this._currentStageDefer.resolve();
+  }
+
   _closeChannels() {
     this._inputChannel.close();
     this._outputChannel.close();
   }
 
-  _transferTo(routerStageClass) {
-    // Extend this procedure if it's necessary.
-    let nextStage = new routerStageClass(this);
-    this._routers[this._name] = nextStage;
-    this._transferredDeferred.promise =
-      this._transferredDeferred.promise.then(() => {
-        nextStage.start();
+  _transferTo(stageMethod) {
+    // 1. Every stage has a stage method.
+    // 2. Stage method will perform some tasks asynchronously
+    // 3. After all those tasks it will solve the promise it returns
+    // 4. And we will resolve another promise to notify outside world
+    //    the stage is done.
+    //
+    // As a result, when transferring:
+    // 1. In theory the current stage method has been executed but might not be resolved yet.
+    // 2. It should has been attached to the pending stage
+    // 3. So the new method should attach to the pending promise as well
+    // 4. Means it should be executed and we append its promise.
+    //
+    this._stages.promise =
+      this._stages.promise.then(() => {
+        // If it is resolved, means the stage is done.
+        this._currentStageDefer = new Defer();
+        stageMethod.call(this, this._currentStageDefer);
+        return this._currentStageDefer.promise;
+      }).catch((err) => {
+        console.error(`Execute stage method ${stageMethod.name} with error: `, err);
+        throw err;
       });
-    this._transferredDeferred.resolve();
   }
 }

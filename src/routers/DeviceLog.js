@@ -5,16 +5,27 @@ import child_process from 'child_process';
 import Router from 'routers/Router';
 import Defer from 'Defer';
 
-export default class RecordingStage extends Router {
+export default class DeviceLog extends Router {
 
-  constructor(configsInstance) {
-    super(configsInstance);
-    this.configs = configsInstance;
+  constructor(configs) {
+    super(configs);
     this._adbPath = this.configs.path.adb;
     this._name = 'devicelog';
   }
 
   start() {
+    // Concat the first stage handler.
+    this._transferToRecordingStage();
+    // Kick-off it.
+    this._stages.resolve();
+  }
+
+  stop() {
+    this._stopListenToControlChannel();
+    this._closeChannels();
+  }
+
+  _recording(defer) {
     console.log('>>>>> device log runs');
     let runIt = child_process.spawn(
       this._adbPath,
@@ -36,8 +47,8 @@ export default class RecordingStage extends Router {
     });
     console.log('>>>>> device log runs spawn done');
 
-    this._transferredDeferred.promise =
-      this._transferredDeferred.promise.then(() => {
+    defer.promise =
+      defer.promise.then(() => {
         // After close, kill the adb logcat process.
         // This is the 'stop' method this command has.
         // Since it mainly forwards to other module,
@@ -47,15 +58,10 @@ export default class RecordingStage extends Router {
         console.error(e);
         throw e;
       });
-    this._transferredDeferred.promise;
   }
 
-  stop() {
-    // Since this is an actually all-in-one router without any stage,
-    // we need to implement the method in this stage.
-    this._stopListenToControlChannel();
-    this._closeChannels();
-  }
+  _collecting(defer) {}
+  _terminating(defer) {}
 
   _onInitialized(initializedRouters) {
     super._onInitialized.apply(this, arguments);
@@ -72,17 +78,15 @@ export default class RecordingStage extends Router {
     }
   }
 
+  _transferToRecordingStage() {
+    this._transferTo(this._recording);
+  }
+
   _transferToCollectingStage() {
-    // Don't actually transfer since we will do nothing in that stage.
-    let deferred = this._transferredDeferred;
-    this._transferredDeferred = new Defer();
-    deferred.resolve();
+    this._transferTo(this._collecting);
   }
 
   _transferToTerminatingStage() {
-    // Don't actually transfer since we will do nothing in that stage.
-    let deferred = this._transferredDeferred;
-    this._transferredDeferred = new Defer();
-    deferred.resolve();
+    this._transferTo(this._terminating);
   }
 }

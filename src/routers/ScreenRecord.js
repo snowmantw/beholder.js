@@ -1,19 +1,14 @@
 'use strict';
 
-import fs from 'fs';
-import os from 'os';
-import child_process from 'child_process';
-import temp from 'temp';
 import csp from 'js-csp';
+import child_process from 'child_process';
 import Router from 'routers/Router';
-import CollectingStage from 'routers/ScreenRecord/CollectingStage';
-import TerminatingStage from 'routers/ScreenRecord/TerminatingStage';
+import Defer from 'Defer';
 
-export default class RecordingStage extends Router {
+export default class ScreenRecord extends Router {
 
-  constructor(configsInstance) {
-    super(configsInstance);
-    this.configs = configsInstance;
+  constructor(configs) {
+    super(configs);
     this._name = 'screenrecord';
 		this._userPreferences = null;
     this._preferenceName = 'layers.screen-recording.enabled';
@@ -22,30 +17,31 @@ export default class RecordingStage extends Router {
     this._deviceTargetPath = this.configs.path.record.target.device;
     this._consoleTargetPath = this.configs.path.record.target.console;
 		this._adbPath = this.configs.path.adb;
+
+    this._ffmpegPath = this.configs.path.ffmpeg;
+    this._extractedFramesPath =
+      this._buildExtractedFramesPath(this._consoleTargetPath);
   }
 
   start() {
+    // Concat the first stage handler.
+    this._transferToRecordingStage();
+    // Kick-off it.
+    this._stages.resolve();
+  }
+
+  stop() {
+    this._stopListenToControlChannel();
+    this._closeChannels();
+  }
+
+  _recording(defer) {
     this._fetchPreferences(this._preferencesPath);
     this._setPreference();
-    this._runCommand(this._deviceTargetPath, this._consoleTargetPath);
-    return this._transferredDeferred.promise;
-  }
 
-  _onStageChange(stage) {
-    switch(stage) {
-      case 'collecting':
-        this._transferToCollectingStage();
-        break;
-      case 'terminating':
-        this._transferToTerminatingStage();
-        break;
-    }
-  }
-
-	_runCommand(deviceTargetPath, consoleTargetPath) {
     let runIt = child_process.spawn(
       this._adbPath,
-      ['shell', 'screenrecord', deviceTargetPath],
+      ['shell', 'screenrecord', this._deviceTargetPath],
       { detached: true }
     );
     runIt.unref();
@@ -59,8 +55,8 @@ export default class RecordingStage extends Router {
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 
-    this._transferredDeferred.promise =
-      this._transferredDeferred.promise.then(() => {
+    defer.promise =
+      defer.promise.then(() => {
         return new Promise((resolve, reject) => {
           try {
             // The recording command needs a SIGINT to stop recording.
@@ -69,10 +65,11 @@ export default class RecordingStage extends Router {
               // Heuristically waiting header writing done.
               setTimeout(() => {
                 // TODO: wait the killing done or racing?
-                this._commandDevice('pull', deviceTargetPath, consoleTargetPath);
+                this._commandDevice('pull',
+                    this._deviceTargetPath, this._consoleTargetPath);
                 if('darwin' === os.platform()) {
                   // Or the file won't open.
-                  this._changeDarwinDefaultGroup(consoleTargetPath);
+                  this._changeDarwinDefaultGroup(this._consoleTargetPath);
                 }
                 console.log('>>>>> pull down', Date.now());
                 resolve();
@@ -87,7 +84,30 @@ export default class RecordingStage extends Router {
         console.error(e);
         throw e;
       });
-	}
+  }
+
+  _collecting(defer) {
+    if (0 === fs.lstatSync(this._consoleTargetPath).size) {
+      // Recorded nothing.
+      return;
+    }
+
+    //ffmpeg -i <the file> ./temp/image%08d.png
+		child_process.execFile(this._ffmpegPath,
+      ['-i', this._consoleTargetPath, this._extractedFramesPath],
+      (error) => {
+        console.log('>>>>>> screen record error: ', error);
+        if (error) {
+          console.error(error);
+          throw error;
+        }
+    });
+  }
+
+  _terminating(defer) {
+    csp.putAsync(this._outputChannel,
+      {'topic': 'data', 'payload': this._pathExtractedFrames});
+  }
 
 	_setPreference() {
 		let userPreferences = this._fetchPreferences(this._preferencesPath);
@@ -190,11 +210,34 @@ export default class RecordingStage extends Router {
     child_process.execSync(`chgrp staff ${recordFilePath}`);
   }
 
+  _buildExtractedFramesPath(consoleTargetPath) {
+    return `${consoleTargetPath}_extracted%08d.png`;
+  }
+
+  _onInitialized(initializedRouters) {
+    super._onInitialized.apply(this, arguments);
+  }
+
+  _onStageChange(stage) {
+    switch(stage) {
+      case 'collecting':
+        this._transferToCollectingStage();
+        break;
+      case 'terminating':
+        this._transferToTerminatingStage();
+        break;
+    }
+  }
+
+  _transferToRecordingStage() {
+    this._transferTo(this._recording);
+  }
+
   _transferToCollectingStage() {
-    this._transferTo(CollectingStage);
+    this._transferTo(this._collecting);
   }
 
   _transferToTerminatingStage() {
-    this._transferTo(TerminatingStage);
+    this._transferTo(this._terminating);
   }
 }

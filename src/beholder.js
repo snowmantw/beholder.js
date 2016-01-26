@@ -6,8 +6,10 @@ import { default as Log } from 'routers/Log/RecordingStage';
 //import Raptor from 'routers/Raptor';
 //import Error from 'routers/Error';
 import { default as ScreenRecord } from 'routers/ScreenRecord/RecordingStage';
-import { default as DeviceLog } from 'routers/DeviceLog/RecordingStage';
 import { default as Signal } from 'routers/Signal/RecordingStage';
+
+import DeviceLog from 'routers/DeviceLog';
+import ScreenRecord from 'routers/ScreenRecord';
 
 /**
  * This launcher & controller module will send initialized
@@ -43,8 +45,6 @@ class Beholder {
     let initialized = {};
     let mainRouterIdentity = this.configs.routers.__main__;
 
-    this._transferredPromises = [];
-
     for (let routerIdendity of this.configs.routers) {
       let router = this._routers[routerIdendity];
       console.log('>>>> router.name: ', router._name, this.configs.routers);
@@ -55,7 +55,7 @@ class Beholder {
       router.connectToController(this._publication);
       console.log('>>>> register: ', routerIdendity);
       initialized[routerIdendity] = router;
-      this._transferredPromises.push(router.start());
+      router.start();
       if (mainRouterIdentity === routerIdendity) {
         mainRouter = router;
       }
@@ -74,12 +74,12 @@ class Beholder {
     console.log('>>>> beholder sent the initialized message');
 
     // Controller needs to listen to signals.
-    this._routers.signal.subscribe(this::this._connectToSignals);
-    //mainRouter.subscribe(this::this._connectToMainRouter);
+    //this._routers.signal.subscribe(this::this._connectToSignals);
+    mainRouter.subscribe(this::this._connectToMainRouter);
   }
 
   async _terminate() {
-    let waitAllTerminated = Promise.all(this._transferredPromises);
+    let waitAllTerminated = Promise.all(this._fetchPendingPromises());
     console.log('>>>> terminating sent');
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'stagechange', 'detail': 'terminating'} });
@@ -90,6 +90,46 @@ class Beholder {
     process.exit(0);
   }
 
+  _resetChannels() {
+    this._outputChannel = csp.chan();
+    this._mainRouterChannel = csp.chan();
+    this._signalChannel = csp.chan();
+
+    this._publication = csp.operations.pub(
+      this._outputChannel, (e) => e.topic);
+  }
+
+  _reinitialize() {
+    let mainRouter;
+    let initialized = {};
+    let mainRouterIdentity = this.configs.routers.__main__;
+
+    // Re-iterate all routers and connect them again.
+    // TODO: a better way to do this in a de-centralized way.
+    // Maybe rename the map of router as a registry with methods.
+    for (let routerIdendity of this.configs.routers) {
+      let router = this._routers[routerIdendity];
+      if (!router) {
+        console.error(`!!!!!!Cannot find router ${routerIdendity} from ${this.configs.routers}`);
+        throw new Error(`Cannot find router ${routerIdendity} from ${this.configs.routers}`);
+      }
+      router.connectToController(this._publication);
+      console.log('>>>> register: ', routerIdendity);
+      if ('signal' === routerIdendity)  {
+        console.log('>>>>>>> signal status: ', router._stagechangedOnce);
+      }
+      initialized[routerIdendity] = router;
+      if (mainRouterIdentity === routerIdendity) {
+        mainRouter = router;
+      }
+    }
+
+    if (!mainRouter) {
+      throw new Error(`Found no main router: ${mainRouterIdentity}`);
+    }
+    mainRouter.subscribe(this::this._connectToMainRouter);
+  }
+
   _connectToMainRouter(publication, transferredDeferred) {
     csp.operations.pub.sub(publication, 'status', this._mainRouterChannel);
     this._mainRouterTransferredDeferred = transferredDeferred;
@@ -97,7 +137,6 @@ class Beholder {
   }
 
   _connectToSignals(publication, transferredDeferred) {
-csp.operations.pub.sub(publication, 'status', this._signalChannel);
     csp.operations.pub.sub(publication, 'data', this._signalChannel);
     this._signalTransferredDeferred = transferredDeferred;
     this._consumeSignals();
@@ -108,14 +147,9 @@ csp.operations.pub.sub(publication, 'status', this._signalChannel);
       let value = yield this._signalChannel;
       while (csp.CLOSED !== value) {
         console.log('>>>>> consume signal: ', value);
-        if ('terminating' === value.payload.type) {
+        if ('terminating' === value.payload) {
           console.log('>>>>> got signal terminating', 'Controller');
           this._terminate();
-        }
-
-        if ('stagechange' === value.payload.type) {
-          console.log('>>>>>> stagechange to dispatch via Signal');
-          this._dispatchStage(value.payload);
         }
         value = yield this._signalChannel;
       }
@@ -128,8 +162,10 @@ csp.operations.pub.sub(publication, 'status', this._signalChannel);
    * ones, they can handle the re-subscription issues by themselves.
    */
   _consumeStageChanges() {
+    console.log('>>>>> start to consume stage change', this._mainRouterChannel.closed);
     csp.go((function*() {
       let value = yield this._mainRouterChannel;
+      console.log('>>>> first value: ', JSON.stringify(value));
       while (csp.CLOSED !== value) {
         console.log('>>>>> consume main');
         if ('stagechange' === value.payload.type) {
@@ -137,6 +173,7 @@ csp.operations.pub.sub(publication, 'status', this._signalChannel);
         }
         value = yield this._mainRouterChannel;
       }
+
     }).bind(this));
   }
 
@@ -145,7 +182,7 @@ csp.operations.pub.sub(publication, 'status', this._signalChannel);
    */
   async _dispatchStage(stagePayload) {
     try {
-    console.log('>>>> dispatch');
+    console.log('>>>> dispatch: ', stagePayload);
     let pendingPromises = this._fetchPendingPromises();
     console.log('>>>>>> pendingPromises length: ', pendingPromises.length);
     let waitPendingPromises = Promise.all(pendingPromises);
@@ -153,6 +190,10 @@ csp.operations.pub.sub(publication, 'status', this._signalChannel);
       'payload': stagePayload });
     await waitPendingPromises;
     console.log(`>>>> [${JSON.stringify(stagePayload)}]: after waiting`);
+
+    console.log('>>>> reset things');
+    this._resetChannels();
+    this._reinitialize();
     } catch(e) {
     console.error(e);
     }

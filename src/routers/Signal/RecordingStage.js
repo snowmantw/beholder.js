@@ -10,7 +10,6 @@ export default class RecordingStage extends Router {
     super(configsInstance);
     this.configs = configsInstance;
     this._name = 'signal';
-    this._interrupted = 0;
   }
 
   start() {
@@ -23,15 +22,11 @@ export default class RecordingStage extends Router {
     terminatingSignals.forEach((signal) => {
       console.log('>>>> book: ', signal);
       process.on(signal, () => {
-        this._interrupted += 1;
-        console.log('>>>>>> send kill signal', this._interrupted);
-        if (1 === this._interrupted) {
-          csp.putAsync(this._outputChannel, {'topic': 'status',
-            'payload':  {'type': 'stagechange', 'detail': 'collecting'}});
-        } else if (2 === this._interrupted) {
-          csp.putAsync(this._outputChannel, {'topic': 'status',
-            'payload':  {'type': 'stagechange', 'detail': 'terminating'}});
-        }
+        if (this._stagechangedOnce) { return; }
+        this._stagechangedOnce = true;
+        console.log('>>>>>> send stagechange signal');
+        csp.putAsync(this._outputChannel, {'topic': 'status',
+          'payload':  {'type': 'stagechange', 'detail': 'collecting'}});
         //csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
       });
     });
@@ -44,6 +39,27 @@ export default class RecordingStage extends Router {
     // we need to implement the method in this stage.
     this._stopListenToControlChannel();
     this._closeChannels();
+  }
+
+  // XXX: only for test (need a way to trigger stage change).
+  _resetSignalHanlder() {
+    let terminatingSignals = [
+      'SIGHUP',
+      'SIGTERM',
+      'SIGINT'
+    ];
+    console.log('>>> Signals run');
+    terminatingSignals.forEach((signal) => {
+      console.log('>>>> book: ', signal);
+      process.on(signal, () => {
+        console.log('>>>>>> send kill signal');
+        csp.putAsync(this._outputChannel, {'topic': 'status',
+          'payload':  {'type': 'stagechange', 'detail': 'terminating'}});
+        //csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
+      });
+    });
+
+    return this._transferredDeferred.promise;
   }
 
   _onInitialized(initializedRouters) {
@@ -65,6 +81,7 @@ export default class RecordingStage extends Router {
     let deferred = this._transferredDeferred;
     this._transferredDeferred = new Defer();
     deferred.resolve();
+    this._resetSignalHanlder();
   }
 
   _transferToTerminatingStage() {
