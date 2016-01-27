@@ -83,7 +83,7 @@ export default class Router {
     }).bind(this));
   }
 
-  _onInitialized(initializedRouters) {
+  _onInitialize(initializedRouters) {
     this._routers = initializedRouters;
   }
   /**

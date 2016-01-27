@@ -26,16 +26,13 @@ class Controller extends Router {
       screenrecord: new ScreenRecord(this.configs),
       devicelog: new DeviceLog(this.configs),
       //log: new Log(this.configs),
-      signal: new Signal(this.configs),
-      controller: this
+      signal: new Signal(this.configs)
     };
     this._mainRouter = this._routers[mainRouterName];
     if (!this._mainRouter) { throw new Error('No main router: ' + mainRouterName); }
     for (let routerIdendity in this._routers) {
       let router = this._routers[routerIdendity];
-      if ('controller' !== router.name) {
-        this._routers.controller.subscribe(router::router.connectToController);
-      }
+      this.subscribe(router::router.connectToController);
     }
 
     this._mainRouter.subscribe(this::this._connectToMainRouter);
@@ -68,7 +65,7 @@ class Controller extends Router {
   }
 
   _consumeMainRouterMessage() {
-    csp.go((async function*() {
+    csp.go((function*() {
       let value = yield this._inputChannel;
       while (csp.CLOSED !== value) {
         if ('stagechange' === value.payload.type) {
@@ -76,21 +73,29 @@ class Controller extends Router {
           // TODO: don't know if this causes problems.
           // We need this await because we need to wait for the current stage change
           // to start the next change.
-          await this._forwardStageChangeRequest(value.payload.detail);
+          this._forwardStageChangeRequest(value.payload.detail);
         }
         value = yield this._inputChannel;
       }
     }).bind(this));
   }
 
-  _forwardStageChangeRequest(stage) {
+  async _forwardStageChangeRequest(stage) {
+    try {
     let currentStagePromises = Object.keys(this._routers).map((name) => {
       let router = this._routers[name];
+      console.log('>>> ', name, typeof router._currentStageDefer);
       return router._currentStageDefer.promise;
     });
+console.log('>>> forward stage: ', stage);
     csp.putAsync(this._outputChannel, {'topic': 'status',
-      'payload': {'type': 'stagechange', 'detail': 'stage'} });
-    return Promise.all(currentStagePromises);
+      'payload': {'type': 'stagechange', 'detail': stage} });
+    await Promise.all(currentStagePromises);
+    console.log('>>> after await');
+    } catch(e) {
+      console.error(e);
+      throw e;
+    }
   }
 
 }

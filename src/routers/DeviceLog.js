@@ -42,7 +42,7 @@ export default class DeviceLog extends Router {
       csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
     runIt.on('close', (status) => {
-      console.log('>>>>> close adb');
+      console.log('>>>>> close from adb');
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
     console.log('>>>>> device log runs spawn done');

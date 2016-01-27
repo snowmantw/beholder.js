@@ -1,6 +1,9 @@
 'use strict';
 
 import csp from 'js-csp';
+import temp from 'temp';
+import os from 'os';
+import fs from 'fs';
 import child_process from 'child_process';
 import Router from 'routers/Router';
 import Defer from 'Defer';
@@ -36,6 +39,7 @@ export default class ScreenRecord extends Router {
   }
 
   _recording(defer) {
+    this._checkDaemonServer();
     this._fetchPreferences(this._preferencesPath);
     this._setPreference();
 
@@ -205,6 +209,10 @@ export default class ScreenRecord extends Router {
 		eval(strPrefs); //eslint-disable-line
 		return preferences;
 	}
+
+  _checkDaemonServer() {
+		child_process.execFileSync(this._adbPath, ['start-server']);
+  }
 
   _changeDarwinDefaultGroup(recordFilePath) {
     child_process.execSync(`chgrp staff ${recordFilePath}`);
