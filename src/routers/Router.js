@@ -46,7 +46,7 @@ export default class Router {
 
   subscribe(...subs) {
     subs.forEach((sub) => {
-      sub(this._publication, this._stages.promise);
+      sub(this._publication);
     });
     return this;
   }
@@ -63,8 +63,9 @@ export default class Router {
       while (csp.CLOSED !== value) {
         let {type, detail} = value.payload;
         switch(value.payload.type) {
-          case 'initialized':
-            this._onInitialized(detail);
+          case 'initialize':
+            this._onInitialize(detail);
+            this.start();
             break;
           case 'finalize':  // After the latest stage to resolve that stage promise.
             this._stopListenToControlChannel();
@@ -73,7 +74,6 @@ export default class Router {
             break;
           case 'stagechange':
             this._stopListenToControlChannel();
-            this._closeChannels();
             this._stopCurrentStage();
             // Should dispatch & start a new stage.
             this._onStageChange(value.payload.detail);
@@ -97,6 +97,11 @@ export default class Router {
 
   _stopListenToControlChannel() {
     csp.operations.pub.unsub(
+      this._controllerPublication, 'status', this._controlChannel);
+  }
+
+  _startListenToControlChannel() {
+    csp.operations.pub.sub(
       this._controllerPublication, 'status', this._controlChannel);
   }
 
@@ -126,6 +131,8 @@ export default class Router {
       this._stages.promise.then(() => {
         // If it is resolved, means the stage is done.
         this._currentStageDefer = new Defer();
+        // Resume to listen to the control channel.
+        this._startListenToControlChannel();
         stageMethod.call(this, this._currentStageDefer);
         return this._currentStageDefer.promise;
       }).catch((err) => {

@@ -4,15 +4,26 @@ import csp from 'js-csp';
 import Router from 'routers/Router';
 import Defer from 'Defer';
 
-export default class RecordingStage extends Router {
+export default class Signal extends Router {
 
-  constructor(configsInstance) {
-    super(configsInstance);
-    this.configs = configsInstance;
+  constructor(configs) {
+    super(configs);
     this._name = 'signal';
   }
 
   start() {
+    // Concat the first stage handler.
+    this._transferToRecordingStage();
+    // Kick-off it.
+    this._stages.resolve();
+  }
+
+  stop() {
+    this._stopListenToControlChannel();
+    this._closeChannels();
+  }
+
+  _recording() {
     let terminatingSignals = [
       'SIGHUP',
       'SIGTERM',
@@ -30,19 +41,9 @@ export default class RecordingStage extends Router {
         //csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
       });
     });
-
-    return this._transferredDeferred.promise;
   }
 
-  stop() {
-    // Since this is an actually all-in-one router without any stage,
-    // we need to implement the method in this stage.
-    this._stopListenToControlChannel();
-    this._closeChannels();
-  }
-
-  // XXX: only for test (need a way to trigger stage change).
-  _resetSignalHanlder() {
+  _collecting() {
     let terminatingSignals = [
       'SIGHUP',
       'SIGTERM',
@@ -58,13 +59,9 @@ export default class RecordingStage extends Router {
         //csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
       });
     });
-
-    return this._transferredDeferred.promise;
   }
 
-  _onInitialized(initializedRouters) {
-    super._onInitialized.apply(this, arguments) ;
-  }
+  _terminating() {}
 
   _onStageChange(stage) {
     switch(stage) {
@@ -76,18 +73,16 @@ export default class RecordingStage extends Router {
         break;
     }
   }
+
+  _transferToRecordingStage() {
+    this._transferTo(this._recording);
+  }
+
   _transferToCollectingStage() {
-    // Don't actually transfer since we will do nothing in that stage.
-    let deferred = this._transferredDeferred;
-    this._transferredDeferred = new Defer();
-    deferred.resolve();
-    this._resetSignalHanlder();
+    this._transferTo(this._collecting);
   }
 
   _transferToTerminatingStage() {
-    // Don't actually transfer since we will do nothing in that stage.
-    let deferred = this._transferredDeferred;
-    this._transferredDeferred = new Defer();
-    deferred.resolve();
+    this._transferTo(this._terminating);
   }
 }
