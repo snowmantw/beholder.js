@@ -73,7 +73,6 @@ export default class Router {
             this._stopCurrentStage();
             break;
           case 'stagechange':
-            this._stopListenToControlChannel();
             this._stopCurrentStage();
             // Should dispatch & start a new stage.
             this._onStageChange(value.payload.detail);
@@ -93,16 +92,6 @@ export default class Router {
    */
   _onStageChange(stage) {
     throw new Error('Instance should extend this method.');
-  }
-
-  _stopListenToControlChannel() {
-    csp.operations.pub.unsub(
-      this._controllerPublication, 'status', this._controlChannel);
-  }
-
-  _startListenToControlChannel() {
-    csp.operations.pub.sub(
-      this._controllerPublication, 'status', this._controlChannel);
   }
 
   _stopCurrentStage() {
@@ -131,8 +120,6 @@ export default class Router {
       this._stages.promise.then(() => {
         // If it is resolved, means the stage is done.
         this._currentStageDefer = new Defer();
-        // Resume to listen to the control channel.
-        this._startListenToControlChannel();
         stageMethod.call(this, this._currentStageDefer);
         return this._currentStageDefer.promise;
       }).catch((err) => {
