@@ -43,6 +43,7 @@ class Controller extends Router {
   }
 
   async stop() {
+    try {
     if ('terminating' !== this._stage) {
       throw new Error('Must be in the terminating stage ' +
         'before calling stop (current one is: ' + this._stage + ' )');
@@ -57,8 +58,12 @@ class Controller extends Router {
 
     // To wait terminating stage done. It must be the stage before the this
     // method get invoked.
-    await currentStagePromises();
+    await Promise.all(currentStagePromises);
     console.log('>>>> stop done');
+    } catch(e) {
+      console.error(e);
+      throw e;
+    }
   }
 
   _connectToMainRouter(publication) {
