@@ -7,6 +7,8 @@ import DeviceLog from 'routers/DeviceLog';
 import ScreenRecord from 'routers/ScreenRecord';
 import Router from 'routers/Router';
 
+import Defer from 'Defer';
+
 class Controller extends Router {
 
   constructor() {
@@ -56,6 +58,7 @@ class Controller extends Router {
     // To wait terminating stage done. It must be the stage before the this
     // method get invoked.
     await currentStagePromises();
+    console.log('>>>> stop done');
   }
 
   _connectToMainRouter(publication) {
@@ -65,19 +68,28 @@ class Controller extends Router {
   }
 
   _consumeMainRouterMessage() {
-    csp.go((function*() {
-      let value = yield this._inputChannel;
-      while (csp.CLOSED !== value) {
-        if ('stagechange' === value.payload.type) {
-          this._stage = value.payload.detail;
-          // TODO: don't know if this causes problems.
-          // We need this await because we need to wait for the current stage change
-          // to start the next change.
-          this._forwardStageChangeRequest(value.payload.detail);
+    let fn = function*() {
+      try {
+        let value = yield this._inputChannel;
+        while (value !== csp.CLOSED) {
+          if ('finalize' === value.payload.type) {
+            this.stop();
+          } else if ('stagechange' === value.payload.type) {
+            this._stage = value.payload.detail;
+            // We need this await because we need to wait for the current stage change
+            // to start the next change.
+            this._forwardStageChangeRequest(value.payload.detail);
+          }
+          value = yield this._inputChannel;
+          console.log('>>>>> to get the next value DONE');
         }
-        value = yield this._inputChannel;
+        console.log('>>>>> yielding stops');
+      } catch(e) {
+        console.error('""try to catch error', e);
+        throw e;
       }
-    }).bind(this));
+    }
+    csp.go(fn.bind(this));
   }
 
   async _forwardStageChangeRequest(stage) {
@@ -102,3 +114,4 @@ console.log('>>> forward stage: ', stage);
 
 let controller = new Controller();
 controller.start();
+//controller.test();

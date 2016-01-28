@@ -68,7 +68,6 @@ export default class Router {
             this.start();
             break;
           case 'finalize':  // After the latest stage to resolve that stage promise.
-            this._stopListenToControlChannel();
             this._closeChannels();
             this._stopCurrentStage();
             break;

@@ -24,44 +24,51 @@ export default class Signal extends Router {
   }
 
   _recording() {
+    // Two "signals": inputs from stdin and system signals.
     let terminatingSignals = [
       'SIGHUP',
       'SIGTERM',
       'SIGINT'
     ];
     console.log('>>> Signals run');
+    this._nextStageBySignal = 'collecting';
     terminatingSignals.forEach((signal) => {
-      console.log('>>>> book: ', signal);
-      process.on(signal, () => {
-        if (this._stagechangedOnce) { return; }
-        this._stagechangedOnce = true;
-        console.log('>>>>>> send stagechange signal');
-        csp.putAsync(this._outputChannel, {'topic': 'status',
-          'payload':  {'type': 'stagechange', 'detail': 'collecting'}});
-        //csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
-      });
+      process.on(signal, this::this._onStageTransferringSignal);
     });
+
+    let stdin = process.openStdin();
+    stdin.on('data', this::this._onInput);
   }
 
   _collecting() {
-    let terminatingSignals = [
-      'SIGHUP',
-      'SIGTERM',
-      'SIGINT'
-    ];
-    console.log('>>> Signals run');
-    terminatingSignals.forEach((signal) => {
-      console.log('>>>> book: ', signal);
-      process.on(signal, () => {
-        console.log('>>>>>> send kill signal');
-        csp.putAsync(this._outputChannel, {'topic': 'status',
-          'payload':  {'type': 'stagechange', 'detail': 'terminating'}});
-        //csp.putAsync(this._outputChannel, {'topic': 'data', 'payload':  'terminating'});
-      });
+    console.log('>>> in Signal, collecting');
+    this._nextStageBySignal = 'terminating';
+  }
+
+  _terminating(defer) {
+    console.log('>>> in Signal, terminating');
+    this._nextStageBySignal = null;
+    csp.putAsync(this._outputChannel, {'topic': 'status',
+      'payload': {'type': 'finalize'} });
+
+    defer.promise = defer.promise.then(() => {
+      // Stop reading the stdin.
+      process.stdin.pause();
+      console.log('>> in signal, process close stdin');
     });
   }
 
-  _terminating() {}
+  _onInput(code) {
+    // Polling stdin to make it continues listen to user inputs.
+    // This handler deals with other 'signals' other than system signals.
+  }
+
+  _onStageTransferringSignal(signal) {
+    if (this._nextStageBySignal) {
+      csp.putAsync(this._outputChannel, {'topic': 'status',
+        'payload':  {'type': 'stagechange', 'detail': this._nextStageBySignal }});
+    }
+  }
 
   _onStageChange(stage) {
     switch(stage) {
