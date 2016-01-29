@@ -55,6 +55,7 @@ class Controller extends Router {
 
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'finalize'} });
+    console.log('>>>> forwarded the finalize message');
 
     // To wait terminating stage done. It must be the stage before the this
     // method get invoked.
@@ -84,6 +85,7 @@ class Controller extends Router {
     let message = await takeIt();
     console.log('>>>> first message: ', message);
     while(message !== csp.CLOSED) {
+      console.log('"""""" try to loop receive the stage: """"""', Date.now());
       if ('finalize' === message.payload.type) {
         this.stop();
         break;

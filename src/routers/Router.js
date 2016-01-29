@@ -69,6 +69,7 @@ export default class Router {
             break;
           case 'finalize':  // After the latest stage to resolve that stage promise.
             this._closeChannels();
+            // Resolve the promise of the last stage.
             this._stopCurrentStage();
             break;
           case 'stagechange':
@@ -100,6 +101,7 @@ export default class Router {
   _closeChannels() {
     this._inputChannel.close();
     this._outputChannel.close();
+    this._controlChannel.close();
   }
 
   _transferTo(stageMethod) {

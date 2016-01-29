@@ -56,6 +56,7 @@ export default class ScreenRecord extends Router {
       csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
     runIt.on('close', (status) => {
+      console.log('>>> close from adb, screen record');
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 
@@ -84,7 +85,7 @@ export default class ScreenRecord extends Router {
 
     defer.promise =
       defer.promise.then(() => {
-        console.log('>>> start to transfer in ScreenRecord');
+        runIt.kill('SIGINT');
         return onKillDefer.promise;
       }).catch((e) => {
         console.error(e);
@@ -99,15 +100,21 @@ export default class ScreenRecord extends Router {
       return;
     }
 
-    //ffmpeg -i <the file> ./temp/image%08d.png
-		child_process.execFile(this._ffmpegPath,
-      ['-i', this._consoleTargetPath, this._extractedFramesPath],
-      (error) => {
-        console.log('>>>>>> screen record error: ', error);
-        if (error) {
-          console.error(error);
-          throw error;
-        }
+    this._stages.promise = this._stages.promise.then(() => {
+      console.log('>>>>>>>>>""""""""""stages promise step');
+      let commandDefer = new Defer();
+      //ffmpeg -i <the file> ./temp/image%08d.png
+      child_process.execFile(this._ffmpegPath,
+        ['-i', this._consoleTargetPath, this._extractedFramesPath],
+        (error) => {
+          if (error) {
+            console.error(error);
+            commandDefer.reject(error);
+          } else {
+            commandDefer.resolve();
+          }
+      });
+      return commandDefer.promise;
     });
   }
 

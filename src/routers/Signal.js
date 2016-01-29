@@ -40,14 +40,16 @@ export default class Signal extends Router {
     stdin.on('data', this::this._onInput);
   }
 
-  _collecting() {
+  _collecting(defer) {
     console.log('>>> in Signal, collecting');
     this._nextStageBySignal = 'terminating';
   }
 
   _terminating(defer) {
-    console.log('>>> in Signal, terminating');
+    console.log('>>>>> in Signal, terminating');
+
     this._nextStageBySignal = null;
+    console.log('>>>> send the finalize message from Signal');
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'finalize'} });
 
@@ -64,9 +66,19 @@ export default class Signal extends Router {
   }
 
   _onStageTransferringSignal(signal) {
-    if (this._nextStageBySignal) {
-      csp.putAsync(this._outputChannel, {'topic': 'status',
-        'payload':  {'type': 'stagechange', 'detail': this._nextStageBySignal }});
+    if (this._stopSendingStageChange) {
+      return;
+    }
+    csp.putAsync(this._outputChannel, {'topic': 'status',
+      'payload':  {'type': 'stagechange', 'detail': this._nextStageBySignal }});
+
+    // If interrupts fired multiple times in this stage, we need a way
+    // to block the multiple stagechange event. This is a simple way to
+    // do that.
+    if ('terminating' === this._nextStageBySignal) {
+      // We cannot remove the signal listeners because we still need to
+      // prevent user interrupting the program before all steps done.
+      this._stopSendingStageChange = true;
     }
   }
 
@@ -79,6 +91,18 @@ export default class Signal extends Router {
         this._transferToTerminatingStage();
         break;
     }
+  }
+
+  _removeSignalHandler() {
+    let terminatingSignals = [
+      'SIGHUP',
+      'SIGTERM',
+      'SIGINT'
+    ];
+    terminatingSignals.forEach((signal) => {
+      // So we don't fire stagechange according to the signal anymore.
+      process.removeAllListeners(signal);
+    });
   }
 
   _transferToRecordingStage() {
