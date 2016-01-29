@@ -118,12 +118,17 @@ export default class Router {
     // 4. Means it should be executed and we append its promise.
     //
     this._stages.promise =
-      this._stages.promise.then(() => {
+      this._stages.promise.then((async function() {
         // If it is resolved, means the stage is done.
         this._currentStageDefer = new Defer();
-        stageMethod.call(this, this._currentStageDefer);
+
+        // The method is doing things in this stage, so wait it.
+        await stageMethod.call(this, this._currentStageDefer);
+
+        // Only when the current stage finished, and its exiting promise resolved,
+        // we move on to the next stage.
         return this._currentStageDefer.promise;
-      }).catch((err) => {
+      }).bind(this)).catch((err) => {
         console.error(`Execute stage method ${stageMethod.name} with error: `, err);
         throw err;
       });

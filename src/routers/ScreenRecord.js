@@ -100,22 +100,20 @@ export default class ScreenRecord extends Router {
       return;
     }
 
-    this._stages.promise = this._stages.promise.then(() => {
-      console.log('>>>>>>>>>""""""""""stages promise step');
-      let commandDefer = new Defer();
-      //ffmpeg -i <the file> ./temp/image%08d.png
-      child_process.execFile(this._ffmpegPath,
-        ['-i', this._consoleTargetPath, this._extractedFramesPath],
-        (error) => {
-          if (error) {
-            console.error(error);
-            commandDefer.reject(error);
-          } else {
-            commandDefer.resolve();
-          }
-      });
-      return commandDefer.promise;
+    console.log('>>>>>>>>>""""""""""stages promise step');
+    let commandDefer = new Defer();
+    //ffmpeg -i <the file> ./temp/image%08d.png
+    child_process.execFile(this._ffmpegPath,
+      ['-i', this._consoleTargetPath, this._extractedFramesPath],
+      (error) => {
+        if (error) {
+          console.error(error);
+          commandDefer.reject(error);
+        } else {
+          commandDefer.resolve();
+        }
     });
+    return commandDefer.promise;
   }
 
   _terminating(defer) {
