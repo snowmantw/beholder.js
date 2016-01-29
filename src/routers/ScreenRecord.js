@@ -59,31 +59,33 @@ export default class ScreenRecord extends Router {
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 
+    let onKillDefer = new Defer();
+    runIt.on('exit', () => {
+      setTimeout(() => {
+        console.log('>>>> in the callback timeout');
+      try {
+        // TODO: wait the killing done or racing?
+        this._commandDevice('pull',
+            this._deviceTargetPath, this._consoleTargetPath);
+        console.log('>>>> commanDevice to pull it done');
+        if('darwin' === os.platform()) {
+          // Or the file won't open.
+          this._changeDarwinDefaultGroup(this._consoleTargetPath);
+          console.log('>>>>> darwin group changed');
+        }
+        console.log('>>>>> pull down', Date.now());
+        onKillDefer.resolve();
+      } catch(e) {
+          console.error('Error while transferring in ScreenRecord', e);
+          throw e;
+      }
+      }, 500);
+    });
+
     defer.promise =
       defer.promise.then(() => {
-        return new Promise((resolve, reject) => {
-          try {
-            // The recording command needs a SIGINT to stop recording.
-            runIt.kill('SIGINT');
-            runIt.on('exit', () => {
-              // Heuristically waiting header writing done.
-              setTimeout(() => {
-                // TODO: wait the killing done or racing?
-                this._commandDevice('pull',
-                    this._deviceTargetPath, this._consoleTargetPath);
-                if('darwin' === os.platform()) {
-                  // Or the file won't open.
-                  this._changeDarwinDefaultGroup(this._consoleTargetPath);
-                }
-                console.log('>>>>> pull down', Date.now());
-                resolve();
-              }, 500);
-            });
-          } catch(e) {
-            console.error('Error occurs when handling the pulling');
-            reject(e);
-          }
-        });
+        console.log('>>> start to transfer in ScreenRecord');
+        return onKillDefer.promise;
       }).catch((e) => {
         console.error(e);
         throw e;
@@ -91,6 +93,7 @@ export default class ScreenRecord extends Router {
   }
 
   _collecting(defer) {
+    console.log('>>>> collecting in ScreenRecord');
     if (0 === fs.lstatSync(this._consoleTargetPath).size) {
       // Recorded nothing.
       return;
@@ -191,6 +194,8 @@ export default class ScreenRecord extends Router {
 	}
 
 	_commandDevice(...args) {
+    this._checkDaemonServer();
+    this._waitDevice();
 		let result = child_process.execFileSync(this._adbPath, args);
 		this._waitDevice();
 		return result;

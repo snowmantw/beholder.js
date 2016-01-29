@@ -49,6 +49,7 @@ export default class DeviceLog extends Router {
 
     defer.promise =
       defer.promise.then(() => {
+        console.log('>> close the adb logcat because of transferring');
         // After close, kill the adb logcat process.
         // This is the 'stop' method this command has.
         // Since it mainly forwards to other module,
@@ -60,7 +61,10 @@ export default class DeviceLog extends Router {
       });
   }
 
-  _collecting(defer) {}
+  _collecting(defer) {
+    console.log('>>> collecting in DeviceLog');
+  }
+
   _terminating(defer) {}
 
   _onInitialized(initializedRouters) {
