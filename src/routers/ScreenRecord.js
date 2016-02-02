@@ -15,7 +15,8 @@ export default class ScreenRecord extends Router {
     super(configs);
     this._name = 'screenrecord';
     // XXX: Currently we only have 16ms.
-    this._recordfsp = 16;
+    this._recordFPS = 16;
+    this._extractedFrameFileType = 'png';
 		this._userPreferences = null;
     this._preferenceName = 'layers.screen-recording.enabled';
 		this._preferencesPath = '/system/b2g/defaults/pref/user.js';
@@ -53,13 +54,16 @@ export default class ScreenRecord extends Router {
     );
     runIt.unref();
     runIt.stdout.on('data', (data) => {
-      csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
+      csp.putAsync(this._outputChannel,
+        {'topic': 'log', 'source': this._name, 'payload':  data});
     });
     runIt.stderr.on('data', (data) => {
-      csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
+      csp.putAsync(this._outputChannel,
+        {'topic': 'error', 'source': this._name, 'payload': data})
     });
     runIt.on('close', (status) => {
-      csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
+      csp.putAsync(this._outputChannel,
+        {'topic': 'status', 'source': this._name, 'payload': status});
     });
 
     let onKillDefer = new Defer();
@@ -97,11 +101,10 @@ export default class ScreenRecord extends Router {
     }
 		let watcher = fs.watch(path.dirname(this._consoleTargetPath),
     (event, filename) => {
-			console.log(`event is: ${event}, ${Date.now()}`);
-			if (filename) {
-				console.log(`filename provided: ${filename}`);
-			} else {
-				console.log('filename not provided');
+			if (filename && '.' + this._extractedFrameFileType === path.extname(filename)) {
+        let fullPath = `${path.dirname(this._consoleTargetPath) + path.sep + filename}`;
+        csp.putAsync(this._outputChannel, {'topic': 'log', 'source': this._name,
+          'payload': {'type': 'extractedframe', 'detail': fullPath} });
 			}
 		});
 
@@ -124,7 +127,7 @@ export default class ScreenRecord extends Router {
 
   _terminating(defer) {
     csp.putAsync(this._outputChannel,
-      {'topic': 'data', 'payload': this._pathExtractedFrames});
+      {'topic': 'data', 'source': this._name, 'payload': this._pathExtractedFrames});
   }
 
 	_setPreference() {
@@ -235,7 +238,7 @@ export default class ScreenRecord extends Router {
   }
 
   _buildExtractedFramesPath(consoleTargetPath) {
-    return `${consoleTargetPath}_%08d_.png`;
+    return `${consoleTargetPath}_%08d_.${this._extractedFrameFileType}`;
   }
 
   _onInitialized(initializedRouters) {

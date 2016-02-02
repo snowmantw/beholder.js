@@ -5,6 +5,7 @@ import Configure from 'Configure'
 import Signal from 'routers/Signal';
 import DeviceLog from 'routers/DeviceLog';
 import ScreenRecord from 'routers/ScreenRecord';
+import Timeline from 'routers/Timeline';
 import Router from 'routers/Router';
 
 import Defer from 'Defer';
@@ -28,17 +29,18 @@ class Controller extends Router {
       screenrecord: new ScreenRecord(this.configs),
       devicelog: new DeviceLog(this.configs),
       //log: new Log(this.configs),
+      timeline: new Timeline(this.configs),
       signal: new Signal(this.configs)
     };
     this._mainRouter = this._routers[mainRouterName];
     if (!this._mainRouter) { throw new Error('No main router: ' + mainRouterName); }
-    for (let routerIdendity in this._routers) {
-      let router = this._routers[routerIdendity];
+    for (let routerIdentification in this._routers) {
+      let router = this._routers[routerIdentification];
       this.subscribe(router::router.connectToController);
     }
 
     this._mainRouter.subscribe(this::this._connectToMainRouter);
-    csp.putAsync(this._outputChannel, {'topic': 'status',
+    csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'initialize', 'detail': this._routers} });
   }
 
@@ -54,7 +56,7 @@ class Controller extends Router {
       return router._currentStageDefer.promise;
     });
 
-    csp.putAsync(this._outputChannel, {'topic': 'status',
+    csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'finalize'} });
     console.log('>>>> forwarded the finalize message');
 
@@ -112,7 +114,7 @@ class Controller extends Router {
       return router._currentStageDefer.promise;
     });
 console.log('>>> forward stage: ', stage);
-    csp.putAsync(this._outputChannel, {'topic': 'status',
+    csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'stagechange', 'detail': stage} });
     return Promise.all(currentStagePromises).then(() => {console.log('>> after waiting all stage changes');}).catch((e) => { console.error(e);throw e; });
   }

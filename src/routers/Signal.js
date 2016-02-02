@@ -46,7 +46,7 @@ export default class Signal extends Router {
 
   _terminating(defer) {
     this._nextStageBySignal = null;
-    csp.putAsync(this._outputChannel, {'topic': 'status',
+    csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'finalize'} });
 
     defer.promise = defer.promise.then(() => {
@@ -67,7 +67,7 @@ export default class Signal extends Router {
     if (this._stopSendingStageChange) {
       return;
     }
-    csp.putAsync(this._outputChannel, {'topic': 'status',
+    csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload':  {'type': 'stagechange', 'detail': this._nextStageBySignal }});
 
     // If interrupts fired multiple times in this stage, we need a way

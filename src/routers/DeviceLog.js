@@ -33,13 +33,16 @@ export default class DeviceLog extends Router {
     );
     runIt.unref();
     runIt.stdout.on('data', (data) => {
-      csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
+      csp.putAsync(this._outputChannel,
+        {'topic': 'log', 'payload':  data, 'source': this._name});
     });
     runIt.stderr.on('data', (data) => {
-      csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
+      csp.putAsync(this._outputChannel,
+        {'topic': 'error', 'payload': data, 'source': this._name})
     });
     runIt.on('close', (status) => {
-      csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
+      csp.putAsync(this._outputChannel,
+        {'topic': 'status', 'payload': status, 'source': this._name});
     });
 
     defer.promise =

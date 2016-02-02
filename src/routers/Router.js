@@ -86,6 +86,7 @@ export default class Router {
   _onInitialize(initializedRouters) {
     this._routers = initializedRouters;
   }
+
   /**
    * Only intermediate stages need to implement this method, since it doesn't exit
    * via the `stop` method, but the state transferring.
@@ -99,6 +100,9 @@ export default class Router {
     // promise of the after-stage defer.
     this._stages.promise = this._stages.promise.then(() => {
       this._currentStageDefer.resolve();
+    }).catch((err) => {
+      console.error(`Finishing stage with error: `, error);
+      throw err;
     });
   }
 
