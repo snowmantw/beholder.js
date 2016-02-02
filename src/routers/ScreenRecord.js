@@ -4,6 +4,7 @@ import csp from 'js-csp';
 import temp from 'temp';
 import os from 'os';
 import fs from 'fs';
+import path from 'path';
 import child_process from 'child_process';
 import Router from 'routers/Router';
 import Defer from 'Defer';
@@ -13,6 +14,8 @@ export default class ScreenRecord extends Router {
   constructor(configs) {
     super(configs);
     this._name = 'screenrecord';
+    // XXX: Currently we only have 16ms.
+    this._recordfsp = 16;
 		this._userPreferences = null;
     this._preferenceName = 'layers.screen-recording.enabled';
 		this._preferencesPath = '/system/b2g/defaults/pref/user.js';
@@ -63,7 +66,6 @@ export default class ScreenRecord extends Router {
     runIt.on('exit', () => {
       setTimeout(() => {
       try {
-        // TODO: wait the killing done or racing?
         this._commandDevice('pull',
             this._deviceTargetPath, this._consoleTargetPath);
         if('darwin' === os.platform()) {
@@ -93,12 +95,23 @@ export default class ScreenRecord extends Router {
       // Recorded nothing.
       return;
     }
+		let watcher = fs.watch(path.dirname(this._consoleTargetPath),
+    (event, filename) => {
+			console.log(`event is: ${event}, ${Date.now()}`);
+			if (filename) {
+				console.log(`filename provided: ${filename}`);
+			} else {
+				console.log('filename not provided');
+			}
+		});
 
     let commandDefer = new Defer();
     //ffmpeg -i <the file> ./temp/image%08d.png
     child_process.execFile(this._ffmpegPath,
       ['-i', this._consoleTargetPath, this._extractedFramesPath],
       (error) => {
+        watcher.close();
+        console.log('........... The end of extracting frames ', Date.now());
         if (error) {
           console.error(error);
           commandDefer.reject(error);
@@ -222,7 +235,7 @@ export default class ScreenRecord extends Router {
   }
 
   _buildExtractedFramesPath(consoleTargetPath) {
-    return `${consoleTargetPath}_extracted%08d.png`;
+    return `${consoleTargetPath}_%08d_.png`;
   }
 
   _onInitialized(initializedRouters) {

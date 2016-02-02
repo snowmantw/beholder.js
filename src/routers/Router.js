@@ -95,7 +95,11 @@ export default class Router {
   }
 
   _stopCurrentStage() {
-    this._currentStageDefer.resolve();
+    // Wait the previous steps in the stage method, and then kick-off the ending
+    // promise of the after-stage defer.
+    this._stages.promise = this._stages.promise.then(() => {
+      this._currentStageDefer.resolve();
+    });
   }
 
   _closeChannels() {
@@ -117,17 +121,20 @@ export default class Router {
     // 3. So the new method should attach to the pending promise as well
     // 4. Means it should be executed and we append its promise.
     //
+
     this._stages.promise =
-      this._stages.promise.then((async function() {
-        // If it is resolved, means the stage is done.
+      this._stages.promise.then((function() {
+        let mark = Date.now();
+        console.log('............ Update the current stage defer ', this._name, mark);
+        // The "after stage" defer.
         this._currentStageDefer = new Defer();
+        this._currentStageDefer.promise = this._currentStageDefer.promise.then(() => {
+          console.log('OOOOOOOOOO start to resolve the stage defer: ', this._name, mark, Date.now());
+        });
 
+        console.log('................ Call stage method and wait it');
         // The method is doing things in this stage, so wait it.
-        await stageMethod.call(this, this._currentStageDefer);
-
-        // Only when the current stage finished, and its exiting promise resolved,
-        // we move on to the next stage.
-        return this._currentStageDefer.promise;
+        return stageMethod.call(this, this._currentStageDefer);
       }).bind(this)).catch((err) => {
         console.error(`Execute stage method ${stageMethod.name} with error: `, err);
         throw err;

@@ -48,6 +48,7 @@ class Controller extends Router {
       throw new Error('Must be in the terminating stage ' +
         'before calling stop (current one is: ' + this._stage + ' )');
     }
+    console.log('............ in stop, try to get all stage defer promise: ', Date.now());
     let currentStagePromises = Object.keys(this._routers).map((name) => {
       let router = this._routers[name];
       return router._currentStageDefer.promise;
@@ -107,7 +108,7 @@ class Controller extends Router {
   _forwardStageChangeRequest(stage) {
     let currentStagePromises = Object.keys(this._routers).map((name) => {
       let router = this._routers[name];
-      console.log('>>> ', name, typeof router._currentStageDefer);
+      console.log('............ in stagechange, try to get all stage defer promise: ', name, Date.now());
       return router._currentStageDefer.promise;
     });
 console.log('>>> forward stage: ', stage);

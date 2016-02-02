@@ -58,7 +58,6 @@ export default class Signal extends Router {
   _onInput(code) {
     // Polling stdin to make it continues listen to user inputs.
     // This handler deals with other 'signals' other than system signals.
-    console.log('...... Signal, onInput: ', code.toString(), code.toString().length);
     if ('\u001B' === code.toString() || 'a' === code.toString()) {
       this._onStageTransferringSignal();
     }

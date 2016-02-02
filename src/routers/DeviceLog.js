@@ -28,7 +28,7 @@ export default class DeviceLog extends Router {
   _recording(defer) {
     let runIt = child_process.spawn(
       this._adbPath,
-      ['logcat'],
+      ['logcat', '-v', 'time'],
       { detached: true }
     );
     runIt.unref();
