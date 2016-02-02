@@ -26,6 +26,7 @@ export default class DeviceLog extends Router {
   }
 
   _recording(defer) {
+    this._initialDateTime = this._fetchInitialDateTime();
     let runIt = child_process.spawn(
       this._adbPath,
       ['logcat', '-v', 'time'],
