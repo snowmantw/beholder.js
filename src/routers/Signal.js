@@ -30,42 +30,41 @@ export default class Signal extends Router {
       'SIGTERM',
       'SIGINT'
     ];
-    console.log('>>> Signals run');
     this._nextStageBySignal = 'collecting';
     terminatingSignals.forEach((signal) => {
       process.on(signal, this::this._onStageTransferringSignal);
     });
 
     let stdin = process.openStdin();
+    stdin.setRawMode(true);
     stdin.on('data', this::this._onInput);
   }
 
   _collecting(defer) {
-    console.log('>>> in Signal, collecting');
     this._nextStageBySignal = 'terminating';
   }
 
   _terminating(defer) {
-    console.log('>>>>> in Signal, terminating');
-
     this._nextStageBySignal = null;
-    console.log('>>>> send the finalize message from Signal');
     csp.putAsync(this._outputChannel, {'topic': 'status',
       'payload': {'type': 'finalize'} });
 
     defer.promise = defer.promise.then(() => {
       // Stop reading the stdin.
       process.stdin.pause();
-      console.log('>> in signal, process close stdin');
     });
   }
 
   _onInput(code) {
     // Polling stdin to make it continues listen to user inputs.
     // This handler deals with other 'signals' other than system signals.
+    console.log('...... Signal, onInput: ', code.toString(), code.toString().length);
+    if ('\u001B' === code.toString() || 'a' === code.toString()) {
+      this._onStageTransferringSignal();
+    }
   }
 
-  _onStageTransferringSignal(signal) {
+  _onStageTransferringSignal() {
     if (this._stopSendingStageChange) {
       return;
     }

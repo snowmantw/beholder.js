@@ -56,25 +56,20 @@ export default class ScreenRecord extends Router {
       csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
     runIt.on('close', (status) => {
-      console.log('>>> close from adb, screen record');
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
 
     let onKillDefer = new Defer();
     runIt.on('exit', () => {
       setTimeout(() => {
-        console.log('>>>> in the callback timeout');
       try {
         // TODO: wait the killing done or racing?
         this._commandDevice('pull',
             this._deviceTargetPath, this._consoleTargetPath);
-        console.log('>>>> commanDevice to pull it done');
         if('darwin' === os.platform()) {
           // Or the file won't open.
           this._changeDarwinDefaultGroup(this._consoleTargetPath);
-          console.log('>>>>> darwin group changed');
         }
-        console.log('>>>>> pull down', Date.now());
         onKillDefer.resolve();
       } catch(e) {
           console.error('Error while transferring in ScreenRecord', e);
@@ -94,13 +89,11 @@ export default class ScreenRecord extends Router {
   }
 
   _collecting(defer) {
-    console.log('>>>> collecting in ScreenRecord');
     if (0 === fs.lstatSync(this._consoleTargetPath).size) {
       // Recorded nothing.
       return;
     }
 
-    console.log('>>>>>>>>>""""""""""stages promise step');
     let commandDefer = new Defer();
     //ffmpeg -i <the file> ./temp/image%08d.png
     child_process.execFile(this._ffmpegPath,

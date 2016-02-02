@@ -26,30 +26,24 @@ export default class DeviceLog extends Router {
   }
 
   _recording(defer) {
-    console.log('>>>>> device log runs');
     let runIt = child_process.spawn(
       this._adbPath,
       ['logcat'],
       { detached: true }
     );
-    console.log('>>>>> device log runs spawn');
     runIt.unref();
     runIt.stdout.on('data', (data) => {
       csp.putAsync(this._outputChannel, {'topic': 'log', 'payload':  data});
     });
     runIt.stderr.on('data', (data) => {
-      console.log('>>>>> error adb');
       csp.putAsync(this._outputChannel, {'topic': 'error', 'payload': data})
     });
     runIt.on('close', (status) => {
-      console.log('>>>>> close from adb');
       csp.putAsync(this._outputChannel, {'topic': 'status', 'payload': status});
     });
-    console.log('>>>>> device log runs spawn done');
 
     defer.promise =
       defer.promise.then(() => {
-        console.log('>> close the adb logcat because of transferring');
         // After close, kill the adb logcat process.
         // This is the 'stop' method this command has.
         // Since it mainly forwards to other module,
@@ -62,7 +56,6 @@ export default class DeviceLog extends Router {
   }
 
   _collecting(defer) {
-    console.log('>>> collecting in DeviceLog');
   }
 
   _terminating(defer) {}
