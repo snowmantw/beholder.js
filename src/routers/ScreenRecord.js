@@ -8,6 +8,7 @@ import path from 'path';
 import child_process from 'child_process';
 import Router from 'routers/Router';
 import Defer from 'Defer';
+import { checkDaemonServer, commandDevice } from 'AndroidDaemonBus';
 
 export default class ScreenRecord extends Router {
 
@@ -43,7 +44,7 @@ export default class ScreenRecord extends Router {
   }
 
   _recording(defer) {
-    this._checkDaemonServer();
+    checkDaemonServer(this._adbPath);
     this._fetchPreferences(this._preferencesPath);
     this._setPreference();
 
@@ -70,8 +71,8 @@ export default class ScreenRecord extends Router {
     runIt.on('exit', () => {
       setTimeout(() => {
       try {
-        this._commandDevice('pull',
-            this._deviceTargetPath, this._consoleTargetPath);
+        commandDevice(this._adbPath)('pull',
+          this._deviceTargetPath, this._consoleTargetPath);
         if('darwin' === os.platform()) {
           // Or the file won't open.
           this._changeDarwinDefaultGroup(this._consoleTargetPath);
@@ -143,7 +144,7 @@ export default class ScreenRecord extends Router {
 			throw e;
 		} finally {
 			this._clearLocalPreferences();
-			this._commandDevice('reboot');
+      commandDevice(this._adbPath)('reboot');
 		}
 	}
 
@@ -160,7 +161,7 @@ export default class ScreenRecord extends Router {
 			throw e;
 		} finally {
 			this._clearLocalPreferences();
-			this._commandDevice('reboot');
+			commandDevice(this._adbPath)('reboot');
 		}
 	}
 
@@ -175,9 +176,10 @@ export default class ScreenRecord extends Router {
         }
 			});
 			fs.writeFileSync(this._preferencesTempFilePath, lines.join('\n'));
-			this._commandDevice('root');
-			this._commandDevice('remount');
-			this._commandDevice('push', this._preferencesTempFilePath, this._preferencesPath);
+			commandDevice(this._adbPath)('root');
+			commandDevice(this._adbPath)('remount');
+			commandDevice(this._adbPath)('push',
+        this._preferencesTempFilePath, this._preferencesPath);
 		} finally {
 			fs.access(this._preferencesTempFilePath, fs.F_OK, (accessError) => {
 				if (!accessError) {
@@ -197,7 +199,7 @@ export default class ScreenRecord extends Router {
 			return this._userPreferences;
 		}
 		let strPrefs =
-			this._commandDevice('shell', 'cat', preferencePath).toString();
+			commandDevice(this._adbPath)('shell', 'cat', preferencePath).toString();
 		try {
 			this._userPreferences = this._evalPrefs(strPrefs);
 			return this._userPreferences;
@@ -205,18 +207,6 @@ export default class ScreenRecord extends Router {
 			console.error('Error occurs when reading the preferences: ', e);
 			throw e;
 		}
-	}
-
-	_commandDevice(...args) {
-    this._checkDaemonServer();
-    this._waitDevice();
-		let result = child_process.execFileSync(this._adbPath, args);
-		this._waitDevice();
-		return result;
-	}
-
-	_waitDevice() {
-		child_process.execFileSync(this._adbPath, ['wait-for-device']);
 	}
 
 	// Otherwise it's difficult to grep the preference and it's value.
@@ -228,10 +218,6 @@ export default class ScreenRecord extends Router {
 		eval(strPrefs); //eslint-disable-line
 		return preferences;
 	}
-
-  _checkDaemonServer() {
-		child_process.execFileSync(this._adbPath, ['start-server']);
-  }
 
   _changeDarwinDefaultGroup(recordFilePath) {
     child_process.execSync(`chgrp staff ${recordFilePath}`);
