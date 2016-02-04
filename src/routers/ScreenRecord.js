@@ -199,7 +199,7 @@ export default class ScreenRecord extends Router {
 			return this._userPreferences;
 		}
 		let strPrefs =
-			commandDevice(this._adbPath)('shell', 'cat', preferencePath).toString();
+			commandDevice(this._adbPath)('shell', 'cat', preferencePath);
 		try {
 			this._userPreferences = this._evalPrefs(strPrefs);
 			return this._userPreferences;

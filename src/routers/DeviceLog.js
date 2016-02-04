@@ -35,7 +35,7 @@ export default class DeviceLog extends Router {
   _fetchTimeInformation() {
     this._initialEpoch = this._fetchInitialEpoch();
     this._deviceTZ = this._commandDevice(
-      'shell', 'getprop', 'persist.sys.timezone').toString().trim();
+      'shell', 'getprop', 'persist.sys.timezone');
     this._deviceYear = parseInt(this._commandDevice(
       'shell', `TZ=${this._deviceTZ}`, 'date', '+%Y').toString(), 10);
   }
@@ -52,7 +52,9 @@ export default class DeviceLog extends Router {
       this._logs.push(chunk.toString());
     });
     runIt.stderr.on('data', (chunk) => {
-      this._errors.push(chunk.toString());
+      csp.putAsync(this._outputChannel,
+        {'topic': 'error', 'source': this._name,
+         'payload': chunk.toString()});
     });
     runIt.on('close', (status) => {
       csp.putAsync(this._outputChannel,
@@ -163,7 +165,7 @@ export default class DeviceLog extends Router {
 
   _fetchInitialEpoch() {
     let seconds = parseFloat(this._commandDevice(
-      'shell', 'echo', '$EPOCHREALTIME').toString().trim(), 10);
+      'shell', 'echo', '$EPOCHREALTIME'), 10);
     return Math.round(seconds * 1000);
   }
 

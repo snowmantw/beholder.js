@@ -10,9 +10,9 @@ export	function commandDevice(adbPath, envs) {
     if (envs) {
       result = child_process.execFileSync(adbPath, args, {
         'env': envs
-      });
+      }).toString().trim();
     } else {
-      result = child_process.execFileSync(adbPath, args);
+      result = child_process.execFileSync(adbPath, args).toString().trim();
     }
     waitDevice();
     return result;
