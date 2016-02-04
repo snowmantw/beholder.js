@@ -11,6 +11,7 @@ module.exports = {
   },
   node: {__dirname: true, __filename: true},
   resolve: { root: path.resolve('./src') },
+  externals: ['time'],
   module: {
     loaders: [
       { include: path.resolve(__dirname, './src'),

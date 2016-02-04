@@ -4,6 +4,7 @@ import csp from 'js-csp';
 import child_process from 'child_process';
 import Router from 'routers/Router';
 import Defer from 'Defer';
+import Time from 'time';
 import { commandDevice } from 'AndroidDaemonBus';
 
 export default class DeviceLog extends Router {
@@ -12,11 +13,16 @@ export default class DeviceLog extends Router {
     super(configs);
     this._adbPath = this.configs.path.adb;
     this._name = 'devicelog';
+    this._commandDevice = commandDevice(this._adbPath);
+    this._logs = [];
+    this._errors = [];
   }
 
   start() {
     // Concat the first stage handler.
     this._transferToRecordingStage();
+    this._fetchTimeInformation();
+
     // Kick-off it.
     this._stages.resolve();
   }
@@ -26,44 +32,27 @@ export default class DeviceLog extends Router {
     this._closeChannels();
   }
 
-  _recording(defer) {
+  _fetchTimeInformation() {
     this._initialEpoch = this._fetchInitialEpoch();
-    this._deviceYear = (new Date(this._initialEpoch)).getUTCFullYear();
+    this._deviceTZ = this._commandDevice(
+      'shell', 'getprop', 'persist.sys.timezone').toString().trim();
+    this._deviceYear = parseInt(this._commandDevice(
+      'shell', `TZ=${this._deviceTZ}`, 'date', '+%Y').toString(), 10);
+  }
 
+  _recording(defer) {
     // Turn all timestamps in the log to epoch, then substract them.
     let runIt = child_process.spawn(
       this._adbPath,
       ['logcat', '-v', 'time'],
-      { env: {'TZ': 'Etc/UTC'}, detached: true }
+      { detached: true }
     );
     runIt.unref();
-    runIt.stdout.on('data', (data) => {
-      let lines = this._splitLines(data.toString());
-      lines.map((line) => line.trim()).forEach((line) => {
-        // Don't care empty lines.
-        if ('' === line) { return; }
-        let timeOffsetLine = this._timeOffsetFromDateTime(line);
-        // Something makes it cannot be marked.
-        if (!timeOffsetLine) { return; }
-      console.log(':::::::::::: line: ', timeOffsetLine);
-        csp.putAsync(this._outputChannel,
-          {'topic': 'log', 'source': this._name,
-           'payload': timeOffsetLine });
-      });
+    runIt.stdout.on('data', (chunk) => {
+      this._logs.push(chunk.toString());
     });
-    runIt.stderr.on('data', (data) => {
-      let lines = this._splitLines(data.toString());
-      lines.map((line) => line.trim()).forEach((line) => {
-        // Don't care empty lines.
-        if ('' === line) { return; }
-        let timeOffsetLine = this._timeOffsetFromDateTime(line);
-        // Something makes it cannot be marked.
-        if (!timeOffsetLine) { return; }
-      console.log(':::::::::::: line: ', timeOffsetLine);
-        csp.putAsync(this._outputChannel,
-          {'topic': 'error', 'source': this._name,
-           'payload': timeOffsetLine });
-      });
+    runIt.stderr.on('data', (chunk) => {
+      this._errors.push(chunk.toString());
     });
     runIt.on('close', (status) => {
       csp.putAsync(this._outputChannel,
@@ -84,39 +73,98 @@ export default class DeviceLog extends Router {
   }
 
   _collecting(defer) {
+    // Some lines are overflowed from the previous year.
+    let survivors = [];
+    let strLogs = this._logs.join('');
+    let lines = this._splitLines(strLogs);
+    let maxOffset = 0;
+
+    lines.map((line) => line.trim()).forEach((line) => {
+      // Don't handle empty lines.
+      if ('' === line) { return; }
+      let {offset, content} = this._timeOffsetFromDateTime(line);
+      // Something makes it cannot be parsed.
+      if (!offset || offset < 0) { return; }
+
+      if (offset > maxOffset) { maxOffset = offset; }
+      // Suddenly some log is younger than previous one,
+      // means those olders are too old (in the previous year,
+      // due to the missing "year" in the log)
+      else if (offset < maxOffset) {
+        // Means that only logs after this line are valid.
+        // So we empty it and start over.
+        survivors.length = 0;
+        maxOffset = offset;
+      }
+      survivors.push({offset, content});
+    });
+
+    survivors.forEach((payload) => {
+      console.log('...', payload.offset, payload.content.join(''));
+      csp.putAsync(this._outputChannel,
+        {'topic': 'log', 'source': this._name,
+         'payload': payload});
+    });
   }
 
   _terminating(defer) {}
 
   _splitLines(lines) {
-    return lines.split('\n');
+    return lines.split('\r');
   }
 
-  _timeOffsetFromDateTime(data) {
-    let [date, time, ...others] = data.split(' ');
-    console.log('date, time, others: {', date, '}', '{', time, '} -- ', data);
-    let offset = this._epochTimeFromDateTime(this._deviceYear, date, time) - this._initialEpoch;
-    if (isNaN(offset)) { return; }
-console.log('>>', time, date, this._epochTimeFromDateTime(this._deviceYear, date, time), this._initialEpoch);
-    others.unshift(offset);
-    return others.join(' ');
-  }
-
-  _epochTimeFromDateTime(year, date, time) {
-    console.log('year, date, time: ', year, date, time);
-    // ex: 12-31 19:18:38.309
+  _timeOffsetFromDateTime(line) {
+    let [date, time, ...content] = line.split(' ');
+    let timeSlots = this._timeSlotsFromDateTime(date, time);
+    if (isNaN(timeSlots.M)) {
+      console.error('Cannot parse date-time from the log: ', line);
+      return {};
+    }
     // We need to append year on that date.
+    timeSlots.Y = this._deviceYear;
+    let offset = this._epochTimeFromDateTime(timeSlots) - this._initialEpoch;
+    return {offset, content};
+  }
 
-    let [M,d] = date.split('-');
-    let [hms, ms] = time.split('.');
-    let [h, m, s] = hms.split(':');
-    return Date.UTC(year, M, d, h, m, s, ms);
+  _timeSlotsFromDateTime(date, time) {
+    // ex: 12-31 19:18:38.309
+    try {
+      let [M,d] = date.split('-');
+      let [hms, ms] = time.split('.');
+      let [h, m, s] = hms.split(':');
+      M = parseInt(M, 10) - 1;
+      d = parseInt(d, 10);
+      h = parseInt(h, 10);
+      m = parseInt(m, 10);
+      s = parseInt(s, 10);
+      ms = parseInt(ms, 10);
+      let slots = {M, d, h, m, s, ms};
+      for (let name in slots) {
+        if (isNaN(slots[name])) {
+          throw new Error('Cannot convert slot into integer: ' + name);
+        }
+      }
+      return slots;
+    } catch(e) {
+      return {};
+    }
+  }
+
+  _epochTimeFromDateTime({Y, M, d, h, m, s, ms}) {
+    let epoch = new Time.Date(Y,
+        M,
+        d,
+        h,
+        m,
+        s,
+        ms, this._deviceTZ);
+    return epoch.getTime();
   }
 
   _fetchInitialEpoch() {
-    let initialEpoch = commandDevice(
-      this._adbPath)('shell', 'TZ=Etc/UTC', 'date', '"+%s"');
-    return parseInt(initialEpoch.toString(), 10);
+    let seconds = parseFloat(this._commandDevice(
+      'shell', 'echo', '$EPOCHREALTIME').toString().trim(), 10);
+    return Math.round(seconds * 1000);
   }
 
   _onStageChange(stage) {
