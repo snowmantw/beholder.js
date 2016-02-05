@@ -46,24 +46,21 @@ class Controller extends Router {
 
   async stop() {
     try {
-    if ('terminating' !== this._stage) {
-      throw new Error('Must be in the terminating stage ' +
-        'before calling stop (current one is: ' + this._stage + ' )');
-    }
-    console.log('............ in stop, try to get all stage defer promise: ', Date.now());
-    let currentStagePromises = Object.keys(this._routers).map((name) => {
-      let router = this._routers[name];
-      return router._currentStageDefer.promise;
-    });
+      if ('terminating' !== this._stage) {
+        throw new Error('Must be in the terminating stage ' +
+          'before calling stop (current one is: ' + this._stage + ' )');
+      }
+      let currentStagePromises = Object.keys(this._routers).map((name) => {
+        let router = this._routers[name];
+        return router._currentStageDefer.promise;
+      });
 
-    csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
-      'payload': {'type': 'finalize'} });
-    console.log('>>>> forwarded the finalize message');
+      csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
+        'payload': {'type': 'finalize'} });
 
-    // To wait terminating stage done. It must be the stage before the this
-    // method get invoked.
-    await Promise.all(currentStagePromises);
-    console.log('>>>> stop done');
+      // To wait terminating stage done. It must be the stage before the this
+      // method get invoked.
+      await Promise.all(currentStagePromises);
     } catch(e) {
       console.error(e);
       throw e;
@@ -77,7 +74,6 @@ class Controller extends Router {
   }
 
   async _consumeMainRouterMessage() {
-  try {
     let takeIt = () => {
       let defer = new Defer();
       csp.takeAsync(this._inputChannel,
@@ -86,9 +82,7 @@ class Controller extends Router {
     }
 
     let message = await takeIt();
-    console.log('>>>> first message: ', message);
     while(message !== csp.CLOSED) {
-      console.log('"""""" try to loop receive the stage: """"""', Date.now());
       if ('finalize' === message.payload.type) {
         this.stop();
         break;
@@ -97,26 +91,19 @@ class Controller extends Router {
         // We need this await because we need to wait for the current stage change
         // to start the next change.
         await this._forwardStageChangeRequest(message.payload.detail);
-        console.log('>>>>> after the forwarding in the loop');
       }
       message = await takeIt();
-      console.log('>> updated the message from main router');
     }
-  } catch(e) {
-    console.error('""try to catch error', e);
-    throw e;
-  }}
+  }
 
   _forwardStageChangeRequest(stage) {
     let currentStagePromises = Object.keys(this._routers).map((name) => {
       let router = this._routers[name];
-      console.log('............ in stagechange, try to get all stage defer promise: ', name, Date.now());
       return router._currentStageDefer.promise;
     });
-console.log('>>> forward stage: ', stage);
     csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'stagechange', 'detail': stage} });
-    return Promise.all(currentStagePromises).then(() => {console.log('>> after waiting all stage changes');}).catch((e) => { console.error(e);throw e; });
+    return Promise.all(currentStagePromises);
   }
 
 }

@@ -132,14 +132,11 @@ export default class Router {
     this._stages.promise =
       this._stages.promise.then((function() {
         let mark = Date.now();
-        console.log('............ Update the current stage defer ', this._name, mark);
         // The "after stage" defer.
         this._currentStageDefer = new Defer();
         this._currentStageDefer.promise = this._currentStageDefer.promise.then(() => {
-          console.log('OOOOOOOOOO start to resolve the stage defer: ', this._name, mark, Date.now());
         });
 
-        console.log('................ Call stage method and wait it');
         // The method is doing things in this stage, so wait it.
         return stageMethod.call(this, this._currentStageDefer);
       }).bind(this)).catch((err) => {

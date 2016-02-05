@@ -69,7 +69,7 @@ export default class DeviceLog extends Router {
         // we only need to kill the listener.
         runIt.kill();
       }).catch((e) => {
-        console.error(e);
+        console.error('Error when kill the device logging process', e);
         throw e;
       });
   }

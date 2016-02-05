@@ -77,7 +77,6 @@ export default class ScreenRecord extends Router {
           // Or the file won't open.
           this._changeDarwinDefaultGroup(this._consoleTargetPath);
         }
-    console.log('>> in the end of recording: ', Date.now());
         onKillDefer.resolve();
       } catch(e) {
           console.error('Error while transferring in ScreenRecord', e);
@@ -121,7 +120,6 @@ export default class ScreenRecord extends Router {
       ['-i', this._consoleTargetPath, this._extractedFramesPath],
       (error) => {
         watcher.close();
-        console.log('........... The end of extracting frames ', Date.now());
         if (error) {
           console.error(error);
           commandDefer.reject(error);
