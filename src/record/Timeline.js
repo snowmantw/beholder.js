@@ -1,15 +1,16 @@
 'use strict';
 
 export default class Timeline {
-  constructor(timestamp) {
-    this._timestamp = timestamp;
+  constructor(offset) {
+    this._offset = offset;
     this._slots = {};
   }
 
-  push(source, data) {
+  push(source, type, content) {
     if (this._slots[source]) {
-      throw new Error('The same source should not have two data at the same time');
+      this._slots[source].push({ type, content });
+    } else {
+      this._slots[source] = [{ type, content }];
     }
-    this._slots[source] = data;
   }
 }

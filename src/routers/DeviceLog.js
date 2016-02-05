@@ -102,7 +102,7 @@ export default class DeviceLog extends Router {
     });
 
     survivors.forEach((payload) => {
-      console.log('...', payload.offset, payload.content.join(''));
+      payload.type = 'devicelog';
       csp.putAsync(this._outputChannel,
         {'topic': 'log', 'source': this._name,
          'payload': payload});
@@ -125,6 +125,7 @@ export default class DeviceLog extends Router {
     // We need to append year on that date.
     timeSlots.Y = this._deviceYear;
     let offset = this._epochTimeFromDateTime(timeSlots) - this._initialEpoch;
+    content = content.join(' ')
     return {offset, content};
   }
 

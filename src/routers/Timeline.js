@@ -38,31 +38,30 @@ export default class Timeline extends Router {
       {'topic': 'data', 'source': this._name, 'payload': this._timeline});
   }
 
-  _onInitialized(routers) {
-    super._onInitialized.apply(this, arguments);
+  _onInitialize(routers) {
+    super._onInitialize.apply(this, arguments);
     Object.keys(routers).forEach((name) => {
       let router = routers[name];
       switch (name) {
         case 'screenrecord':
         case 'devicelog':
-          router.subscribe(this._connect);
+          router.subscribe(this._connect.bind(this));
           break;
       }
     });
+    this._consumeMessage();
   }
 
   _connect(publication) {
-    csp.operations.pub.sub(publication, 'log', this._input);
-    csp.operations.pub.sub(publication, 'error', this._input);
-    this._consumeMessage();
+    csp.operations.pub.sub(publication, 'log', this._inputChannel);
   }
 
   _consumeMessage() {
     csp.go((function*() {
-      let value = yield this._input;
+      let value = yield this._inputChannel;
       while (csp.CLOSED !== value) {
         this._onInput(value);
-        value = yield this._input;
+        value = yield this._inputChannel;
       }
     }).bind(this));
   }
@@ -72,11 +71,21 @@ export default class Timeline extends Router {
    */
   _onInput(value) {
     let source = value.source;
-    let { timestamp, data } = value.payload.detail;
-    if (!this._timeline[timestamp]) {
-      this._timeline[timestamp] = new TimelineRecord(timestamp);
+    if (!value.payload) { console.log('LOG WITHOUT PAYLOAD: ', value) ;return; }
+    if (!this._checkLogValid(value.payload)) { return; }
+    let { offset, type, content } = value.payload;
+    if (!this._timeline[offset]) {
+      this._timeline[offset] = new TimelineRecord(offset);
     }
-    this._timeline[timestamp].push(source, data);
+    this._timeline[offset].push(source, type, content);
+  }
+
+  _checkLogValid(log) {
+    if (!log.offset || !log.type || !log.content) {
+      return false;
+    } else {
+      return true;
+    }
   }
 
   _onStageChange(stage) {

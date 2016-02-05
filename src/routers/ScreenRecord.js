@@ -16,7 +16,8 @@ export default class ScreenRecord extends Router {
     super(configs);
     this._name = 'screenrecord';
     // XXX: Currently we only have 16ms.
-    this._recordFPS = 16;
+    // We should move it into the configis.
+    this._recordingFPS = 16;
     this._extractedFrameFileType = 'png';
 		this._userPreferences = null;
     this._preferenceName = 'layers.screen-recording.enabled';
@@ -55,12 +56,11 @@ export default class ScreenRecord extends Router {
     );
     runIt.unref();
     runIt.stdout.on('data', (data) => {
-      csp.putAsync(this._outputChannel,
-        {'topic': 'log', 'source': this._name, 'payload':  data});
+      // This module don't generate any data from console.
     });
-    runIt.stderr.on('data', (data) => {
+    runIt.stderr.on('data', (chunk) => {
       csp.putAsync(this._outputChannel,
-        {'topic': 'error', 'source': this._name, 'payload': data})
+        {'topic': 'error', 'source': this._name, 'payload': chunk.toString()})
     });
     runIt.on('close', (status) => {
       csp.putAsync(this._outputChannel,
@@ -77,6 +77,7 @@ export default class ScreenRecord extends Router {
           // Or the file won't open.
           this._changeDarwinDefaultGroup(this._consoleTargetPath);
         }
+    console.log('>> in the end of recording: ', Date.now());
         onKillDefer.resolve();
       } catch(e) {
           console.error('Error while transferring in ScreenRecord', e);
@@ -104,8 +105,13 @@ export default class ScreenRecord extends Router {
     (event, filename) => {
 			if (filename && '.' + this._extractedFrameFileType === path.extname(filename)) {
         let fullPath = `${path.dirname(this._consoleTargetPath) + path.sep + filename}`;
-        csp.putAsync(this._outputChannel, {'topic': 'log', 'source': this._name,
-          'payload': {'type': 'extractedframe', 'detail': fullPath} });
+        let payload = {'type': 'extractedframe',
+         'offset': this._timeOffsetFromFileName(filename), 'content': fullPath};
+        csp.putAsync(this._outputChannel, {
+          'topic': 'log',
+          'source': this._name,
+          'payload': payload
+        });
 			}
 		});
 
@@ -126,9 +132,17 @@ export default class ScreenRecord extends Router {
     return commandDefer.promise;
   }
 
-  _terminating(defer) {
-    csp.putAsync(this._outputChannel,
-      {'topic': 'data', 'source': this._name, 'payload': this._pathExtractedFrames});
+  _terminating(defer) {}
+
+  _timeOffsetFromFileName(filename) {
+    // ex: test.mp4_00000001_
+    let segs = filename.split('_');
+    // ex: ['test.mp4'......, '00000001', ''];
+    let id = parseInt(segs[segs.length - 2], 10);
+    if (isNaN(id)) { throw new Error('Cannot extract index from file name: ' + filename); }
+    // Assume the first frame ('0000001') means the seconds 0.
+    let offset = this._recordingFPS * (id - 1);
+    return offset;
   }
 
 	_setPreference() {

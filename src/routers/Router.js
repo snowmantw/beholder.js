@@ -99,7 +99,10 @@ export default class Router {
     // Wait the previous steps in the stage method, and then kick-off the ending
     // promise of the after-stage defer.
     this._stages.promise = this._stages.promise.then(() => {
+      // Kick-off it to end the current stage.
       this._currentStageDefer.resolve();
+      // And wait the finishing work to start the next step.
+      return this._currentStageDefer.promise;
     }).catch((err) => {
       console.error(`Finishing stage with error: `, error);
       throw err;
