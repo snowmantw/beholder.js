@@ -13,4 +13,9 @@ export default class Timeline {
       this._slots[source] = [{ type, content }];
     }
   }
+
+  serialize() {
+    // XXX: a better serializing method.
+    return JSON.stringify(this._slots);
+  }
 }

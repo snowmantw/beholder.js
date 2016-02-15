@@ -1,6 +1,7 @@
 'use strict';
 
 import util from 'util';
+import fs from 'fs';
 import csp from 'js-csp';
 import Configure from 'Configure'
 import Signal from 'routers/Signal';
@@ -16,8 +17,8 @@ class Controller extends Router {
   constructor() {
     super();
     this.name = 'controller';
-    this._mainRouter = null;
-    this._mainPublication = null;
+    this._commandRouter = null;
+    this._commandPublication = null;
     this._routers = null;
     this._stage = null;
   }
@@ -25,22 +26,16 @@ class Controller extends Router {
   start() {
     let configure = new Configure();
     this.configs = configure.setup();
-    let mainRouterName = this.configs.routers.__main__;
-    this._routers = {
-      screenrecord: new ScreenRecord(this.configs),
-      devicelog: new DeviceLog(this.configs),
-      //log: new Log(this.configs),
-      timeline: new Timeline(this.configs),
-      signal: new Signal(this.configs)
-    };
-    this._mainRouter = this._routers[mainRouterName];
-    if (!this._mainRouter) { throw new Error('No main router: ' + mainRouterName); }
+    let commandRouterName = this.configs.routers.__command__;
+    let reporterRouterName = this.configs.routers.__reporter__;
+    this._routers = this._initializeRouters(commandRouterName, reporterRouterName);
+    this._commandRouter = this._routers[commandRouterName];
     for (let routerIdentification in this._routers) {
       let router = this._routers[routerIdentification];
       this.subscribe(router::router.connectToController);
     }
 
-    this._mainRouter.subscribe(this::this._connectToMainRouter);
+    this._commandRouter.subscribe(this::this._connectToCommandRouter);
     csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'initialize', 'detail': this._routers} });
   }
@@ -69,13 +64,13 @@ class Controller extends Router {
     }
   }
 
-  _connectToMainRouter(publication) {
-    this._mainPublication = publication;
+  _connectToCommandRouter(publication) {
+    this._commandPublication = publication;
     csp.operations.pub.sub(publication, 'status', this._inputChannel);
-    this._consumeMainRouterMessage();
+    this._consumeCommandRouterMessage();
   }
 
-  async _consumeMainRouterMessage() {
+  async _consumeCommandRouterMessage() {
     let takeIt = () => {
       let defer = new Defer();
       csp.takeAsync(this._inputChannel,
@@ -111,6 +106,24 @@ class Controller extends Router {
     csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'stagechange', 'detail': stage} });
     return Promise.all(currentStagePromises);
+  }
+
+  //TODO: dynamic loading & initializing?
+  _initializeRouters(commandRouterName, reporterRouterName) {
+    let routers = {
+      screenrecord: new ScreenRecord(this.configs),
+      devicelog: new DeviceLog(this.configs),
+      //log: new Log(this.configs),
+      timeline: new Timeline(this.configs),
+      signal: new Signal(this.configs)
+    };
+    if (!routers[commandRouterName]) {
+      throw new Error('No command router: ' + commandRouterName);
+    }
+    if (!routers[reporterRouterName]) {
+      throw new Error('No reporter router: ' + reporterRouterName);
+    }
+    return routers;
   }
 
 }

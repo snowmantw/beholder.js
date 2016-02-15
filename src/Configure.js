@@ -15,7 +15,9 @@ export default class Configure {
 			['',  'record-target-device=ARG', 'where to put the record on the device'],
 			['',  'record-target-console=ARG', 'where to pull the record to the console'],
       ['r', 'routers=ARG+', 'invoke what routers'],
-      ['',  'main=ARG', 'default is Raptor; once it ends the process will end, too'],
+      ['',  'command=ARG', 'default is |raptor|; once it ends the process will end, too'],
+      ['',  'reporter=ARG', 'default is |timeline|; the final collector to generate the report'],
+      ['o', 'output=ARG', 'a file path to output the final result'],
 			['h', 'help', 'display this help'],
 			['v', 'version', 'show version']
 		])
@@ -36,6 +38,7 @@ export default class Configure {
     let configs = this.fromOptions(options);
     configs.tests = testFilePaths;
     this.validateModuleCommands(configs);
+    this.validateOutput(configs);
     return configs;
   }
 
@@ -107,6 +110,15 @@ export default class Configure {
     }
 	}
 
+  validateOutput(configs) {
+    try {
+      fs.accessSync(configs.path.output);
+    } catch(e) {
+      console.error(`Cannot access the output target: "${configs.path.output}"`);
+      throw e;
+    }
+  }
+
   validateModuleCommands(configs) {
     for (let routerIdendity of configs.routers) {
       switch(routerIdendity) {
@@ -142,6 +154,7 @@ export default class Configure {
     defaultConfigs.path.raptor = options.raptor || defaultConfigs.path.raptor;
     defaultConfigs.path.adb = options.adb || defaultConfigs.path.adb;
     defaultConfigs.path.ffmpeg = options.ffmpeg || defaultConfigs.path.ffmpeg;
+    defaultConfigs.path.output = options.output || defaultConfigs.path.output;
 
 		// For ScreenRecord module.
     defaultConfigs.path.record = defaultConfigs.path.record || {
@@ -153,8 +166,12 @@ export default class Configure {
 			defaultConfigs.path.record.target.console;
 
     defaultConfigs.routers = options.routers|| defaultConfigs.routers || [];
-    defaultConfigs.routers.__main__ = options['main'] ||
-      defaultConfigs.routers.__main__|| 'raptor';
+
+    defaultConfigs.routers.__command__ = options['command'] ||
+      defaultConfigs.routers.__command__|| 'raptor';
+
+    defaultConfigs.routers.__reporter__ = options['reporter'] ||
+      defaultConfigs.routers.__reporter__ || 'timeline';
 
     if (!defaultConfigs.routers.includes('signal')) {
       defaultConfigs.routers.push('signal');

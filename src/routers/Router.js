@@ -137,8 +137,7 @@ export default class Router {
         let mark = Date.now();
         // The "after stage" defer.
         this._currentStageDefer = new Defer();
-        this._currentStageDefer.promise = this._currentStageDefer.promise.then(() => {
-        });
+        this._currentStageDefer.promise = this._currentStageDefer.promise.then(() => {});
 
         // The method is doing things in this stage, so wait it.
         return stageMethod.call(this, this._currentStageDefer);

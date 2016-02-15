@@ -1,6 +1,7 @@
 'use strict';
 
 import util from 'util';
+import fs from 'fs';
 import csp from 'js-csp';
 import Router from 'routers/Router';
 import Defer from 'Defer';
@@ -34,10 +35,30 @@ export default class Timeline extends Router {
    * we do the same thing like other routers.
    */
   _terminating(defer) {
+    // XXX: make chunks and a better serializing way to prevent writing blocks.
+    let strTimeline = JSON.stringify(this._timeline);
+    let writingDefer = new Defer();
+    let stream = fs.createWriteStream(this.configs.path.output);
+
     console.log(this._name, Date.now(),
-      `Send the message of timeline collecting result: ${ util.inspect(this._timeline) } `);
-    csp.putAsync(this._outputChannel,
-      {'topic': 'data', 'source': this._name, 'payload': this._timeline});
+      `Write the file "${ this.configs.path.output }" with report of timeline collecting out:`,
+      util.inspect(this._timeline));
+
+    if (!stream.write(strTimeline)) {
+      stream.on('drain', () => {
+        stream.write(strTimeline);
+      });
+    }
+    stream.on('error', writingDefer.reject);
+    stream.end();
+    stream.on('finish', writingDefer.resolve);
+
+    defer.promise = defer.promise.then(() => {
+      return writingDefer.promise;
+    }).catch((e) => {
+      console.error('Error occured when waiting the file writing out');
+      throw e;
+    });
   }
 
   _onInitialize(routers) {
