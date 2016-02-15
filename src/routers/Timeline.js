@@ -44,13 +44,15 @@ export default class Timeline extends Router {
       `Write the file "${ this.configs.path.output }" with report of timeline collecting out:`,
       util.inspect(this._timeline));
 
+    stream.on('error', writingDefer.reject);
     if (!stream.write(strTimeline)) {
       stream.on('drain', () => {
         stream.write(strTimeline);
+        stream.end();
       });
+    } else {
+      stream.end();
     }
-    stream.on('error', writingDefer.reject);
-    stream.end();
     stream.on('finish', writingDefer.resolve);
 
     defer.promise = defer.promise.then(() => {
