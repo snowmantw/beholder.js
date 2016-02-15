@@ -1,11 +1,13 @@
 'use strict';
 
-import csp from 'js-csp';
+
+import util from 'util';
 import temp from 'temp';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import child_process from 'child_process';
+import csp from 'js-csp';
 import Router from 'routers/Router';
 import Defer from 'Defer';
 import { checkDaemonServer, commandDevice } from 'AndroidDaemonBus';
@@ -59,10 +61,15 @@ export default class ScreenRecord extends Router {
       // This module don't generate any data from console.
     });
     runIt.stderr.on('data', (chunk) => {
+      let strChunk = chunk.toString();
+      console.log(this._name, Date.now(),
+        `Send a message of console error: ${ strChunk }`);
       csp.putAsync(this._outputChannel,
-        {'topic': 'error', 'source': this._name, 'payload': chunk.toString()})
+        {'topic': 'error', 'source': this._name, 'payload': strChunk})
     });
     runIt.on('close', (status) => {
+      console.log(this._name, Date.now(),
+        `Send a message of stream closed: ${ status } `);
       csp.putAsync(this._outputChannel,
         {'topic': 'status', 'source': this._name, 'payload': status});
     });
@@ -106,6 +113,9 @@ export default class ScreenRecord extends Router {
         let fullPath = `${path.dirname(this._consoleTargetPath) + path.sep + filename}`;
         let payload = {'type': 'extractedframe',
          'offset': this._timeOffsetFromFileName(filename), 'content': fullPath};
+
+        console.log(this._name, Date.now(),
+          `Send a message of recorded file changed: ${ util.inspect(payload) } `);
         csp.putAsync(this._outputChannel, {
           'topic': 'log',
           'source': this._name,

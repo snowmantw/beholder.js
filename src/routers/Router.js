@@ -1,5 +1,6 @@
 'use strict';
 
+import util from 'util';
 import csp from 'js-csp';
 import Defer from 'Defer';
 
@@ -61,6 +62,7 @@ export default class Router {
     csp.go((function*() {
       let value = yield this._controlChannel;
       while (csp.CLOSED !== value) {
+        console.log(this._name, Date.now(), `Received message: ${ util.inspect(value) }`);
         let {type, detail} = value.payload;
         switch(value.payload.type) {
           case 'initialize':
@@ -104,7 +106,8 @@ export default class Router {
       // And wait the finishing work to start the next step.
       return this._currentStageDefer.promise;
     }).catch((err) => {
-      console.error(`Finishing stage with error: `, error);
+      console.error(this._name, Date.now(),
+        `Finishing stage with error: `, error);
       throw err;
     });
   }
@@ -140,7 +143,8 @@ export default class Router {
         // The method is doing things in this stage, so wait it.
         return stageMethod.call(this, this._currentStageDefer);
       }).bind(this)).catch((err) => {
-        console.error(`Execute stage method ${stageMethod.name} with error: `, err);
+        console.error(this._name, Date.now(),
+          `Execute stage method ${ stageMethod.name } with error: `, error);
         throw err;
       });
   }

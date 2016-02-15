@@ -1,5 +1,6 @@
 'use strict';
 
+import util from 'util';
 import csp from 'js-csp';
 import Router from 'routers/Router';
 import Defer from 'Defer';
@@ -33,7 +34,8 @@ export default class Timeline extends Router {
    * we do the same thing like other routers.
    */
   _terminating(defer) {
-    console.log('........... try to output timeline: ', JSON.stringify(this._timeline));
+    console.log(this._name, Date.now(),
+      `Send the message of timeline collecting result: ${ util.inspect(this._timeline) } `);
     csp.putAsync(this._outputChannel,
       {'topic': 'data', 'source': this._name, 'payload': this._timeline});
   }
@@ -60,6 +62,8 @@ export default class Timeline extends Router {
     csp.go((function*() {
       let value = yield this._inputChannel;
       while (csp.CLOSED !== value) {
+        console.log(this._name, Date.now(),
+          `Received a message of collected data: ${ util.inspect(value) } `);
         this._onInput(value);
         value = yield this._inputChannel;
       }
@@ -71,7 +75,7 @@ export default class Timeline extends Router {
    */
   _onInput(value) {
     let source = value.source;
-    if (!value.payload) { console.log('LOG WITHOUT PAYLOAD: ', value) ;return; }
+    if (!value.payload) { return; }
     if (!this._checkLogValid(value.payload)) { return; }
     let { offset, type, content } = value.payload;
     if (!this._timeline[offset]) {

@@ -1,5 +1,6 @@
 'use strict';
 
+import util from 'util';
 import csp from 'js-csp';
 import child_process from 'child_process';
 import Router from 'routers/Router';
@@ -52,11 +53,16 @@ export default class DeviceLog extends Router {
       this._logs.push(chunk.toString());
     });
     runIt.stderr.on('data', (chunk) => {
+      let strChunk = chunk.toString();
+      console.log(this._name, Date.now(),
+        `Send a message of console error: ${ strChunk } `);
       csp.putAsync(this._outputChannel,
         {'topic': 'error', 'source': this._name,
-         'payload': chunk.toString()});
+         'payload': strChunk()});
     });
     runIt.on('close', (status) => {
+      console.log(this._name, Date.now(),
+        `Send a message of stream closed: ${ status } `);
       csp.putAsync(this._outputChannel,
         {'topic': 'status', 'payload': status, 'source': this._name});
     });
@@ -103,6 +109,8 @@ export default class DeviceLog extends Router {
 
     survivors.forEach((payload) => {
       payload.type = 'devicelog';
+      console.log(this._name, Date.now(),
+        `Send the message of devicelog payload ${ util.inspect(payload) }`);
       csp.putAsync(this._outputChannel,
         {'topic': 'log', 'source': this._name,
          'payload': payload});
@@ -119,7 +127,8 @@ export default class DeviceLog extends Router {
     let [date, time, ...content] = line.split(' ');
     let timeSlots = this._timeSlotsFromDateTime(date, time);
     if (isNaN(timeSlots.M)) {
-      console.error('Cannot parse date-time from the log: ', line);
+      console.warn(this._name, Date.now(),
+        `Cannot parse date-time from the log: ${ line }`);
       return {};
     }
     // We need to append year on that date.

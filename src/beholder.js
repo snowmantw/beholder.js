@@ -1,5 +1,6 @@
 'use strict';
 
+import util from 'util';
 import csp from 'js-csp';
 import Configure from 'Configure'
 import Signal from 'routers/Signal';
@@ -55,6 +56,7 @@ class Controller extends Router {
         return router._currentStageDefer.promise;
       });
 
+      console.log(this._name, Date.now(), `Send |finalize| message out`);
       csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
         'payload': {'type': 'finalize'} });
 
@@ -77,7 +79,9 @@ class Controller extends Router {
     let takeIt = () => {
       let defer = new Defer();
       csp.takeAsync(this._inputChannel,
-        (value) => { defer.resolve(value); });
+        (value) => {
+          console.log(this._name, Date.now(), `Received message: ${ util.inspect(value) }`);
+          defer.resolve(value); });
       return defer.promise;
     }
 
@@ -101,6 +105,9 @@ class Controller extends Router {
       let router = this._routers[name];
       return router._currentStageDefer.promise;
     });
+
+    console.log(this._name, Date.now(),
+      `Send the |stagechange| message out; stage: ${ stage }`);
     csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'stagechange', 'detail': stage} });
     return Promise.all(currentStagePromises);

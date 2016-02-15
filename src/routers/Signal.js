@@ -46,6 +46,8 @@ export default class Signal extends Router {
 
   _terminating(defer) {
     this._nextStageBySignal = null;
+    console.log(this._name, Date.now(),
+      `Send the message from terminating signal out (|finalize|)`);
     csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload': {'type': 'finalize'} });
 
@@ -67,6 +69,8 @@ export default class Signal extends Router {
     if (this._stopSendingStageChange) {
       return;
     }
+    console.log(this._name, Date.now(),
+      `Send the message of |stagechange| out; stagae: ${ this._nextStageBySignal } `);
     csp.putAsync(this._outputChannel, {'topic': 'status', 'source': this._name,
       'payload':  {'type': 'stagechange', 'detail': this._nextStageBySignal }});
 
